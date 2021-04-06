@@ -1,0 +1,11 @@
+查看所有全局环境变量有两个命令：env和printenv
+查看某个环境变量，常用两种方式：printenv 环境变量名或者echo $环境变量名．
+添加全局环境变量使用export命令：
+删除全局变量名使用unset命令，比如想要删除掉刚才添加的DOWNLOAD变量：
+
+永久设置环境变量的几种方法
+前面提到了，在bash shell中对环境变量的所有操作都是暂时性的，退出当前shell就无效了．如何使得对环境变量的设置永久有效？首先得认识以下几个文件：
+    /etc/profile
+    /etc/environment
+    ~/.profile
+    ~/.bashrc

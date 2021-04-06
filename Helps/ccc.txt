@@ -1,0 +1,13 @@
+/usr/include/stdint.h ISO C99: 7.18 Integer types
+<inttypes.h> 
+对于int64_t类型：
+#include <inttypes.h>
+int64_t t;
+printf("%" PRId64 "\n", t);
+
+对于uint64_t类型：
+#include <inttypes.h>
+uint64_t t;
+printf("%" PRIu64 "\n", t);
+
+也可以使用PRIx64十六进制打印

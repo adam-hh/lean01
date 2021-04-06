@@ -1,0 +1,16 @@
+一、设置git的user name和email
+git config --list 查看当前Git环境所有配置
+git config --global user.name ""
+git config --global user.email  ""
+二、检查是否存在SSH Key
+key 的位置 ~/.ssh
+如果没有SSH Key，要先生成一下
+ssh-keygen -t rsa -C "adamhh.wk@gmail.com"
+三、获取SSH Key
+cat id_rsa.pub
+四、GitHub添加SSH Key
+web 登陆github网页，进Settings/ssh and GPG keys
+五、验证和修改
+ssh -T git@github.com
+adam@adam-UB-7B38:~/dev$ ssh -T git@github.com
+Hi adam-hh! You've successfully authenticated, but GitHub does not provide shell access.
