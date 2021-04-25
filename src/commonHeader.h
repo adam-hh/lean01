@@ -25,4 +25,7 @@ extern u_int64_t funcDelta(u_int64_t);
 extern u_int64_t funcS(u_int64_t);
 extern int64_t chinaRemainder(int64_t, int64_t, int64_t, int64_t);
 
+extern u_int64_t powerMode(u_int64_t a, u_int64_t m, u_int64_t k);
+extern u_int64_t resolvePowerMode(u_int64_t k, u_int64_t b, u_int64_t m);
+
 #endif

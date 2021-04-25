@@ -2,7 +2,7 @@
 #define A 122530
 #define M 12473
 #define C 42
-#define PERFECTTEST 8128
+#define PERFECTTEST 234212425255
 
 int main()
 {
@@ -25,7 +25,7 @@ int main()
             if(PTABLESIZE - 1 == i)
                 printf("available numbers in %" PRId64" is more than %" PRId64 "\n", PRIMEUPL, i);
             else
-                printf("available numbers in %" PRId64" is %" PRId64 "\n", PRIMEUPL, i);
+                printf("available numbers in %" PRId64" is %" PRId64 ", last prime is %llu\n", PRIMEUPL, i, pTable[i - 1]);
             break;
         }
         /* printf("%-7" PRId64 " ", pTable[i]);
@@ -62,9 +62,16 @@ int main()
     printf("Euler delta(%"PRId64 ") = %" PRId64 "\n", PERFECTTEST, funcDelta(PERFECTTEST));
     printf("Euler s(%"PRId64 ") = %" PRId64 "\n", PERFECTTEST, funcS(PERFECTTEST));
     //printf("china remainder(%ld, %ld, %ld, %ld) is x = %ld\n", 12, a, 54, m, chinaRemainder(12, a, 54, m));
-    extern u_int64_t funcSRec(u_int64_t x, u_int64_t n);
-    funcSRec(14316,28);
-    putchar('\n');
-
+    //extern u_int64_t funcSRec(u_int64_t x, u_int64_t n);
+    //funcSRec(14316,28);
+    //putchar('\n');
+#define ORIGTEXT 234212425253
+#define ENCKEY 677
+#define MOD 234212425255
+    u_int64_t originText = ORIGTEXT, enckey = ENCKEY, mod = MOD;
+    u_int64_t cipherText = powerMode(originText, mod, enckey);
+    u_int64_t decText = resolvePowerMode(enckey, cipherText, mod);
+    printf("original number is %llu, k value is %lld, mod value is %lld, cihper number is %lld\n", originText, enckey, mod, cipherText);
+    printf("decoded number is %lld\n", decText);
     return 0;
 }
