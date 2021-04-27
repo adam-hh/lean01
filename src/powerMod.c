@@ -95,9 +95,11 @@ C logics: input k, b, m. output x.
 */
 u_int64_t resolvePowerMode(u_int64_t k, u_int64_t b, u_int64_t m)
 {
-    u_int64_t fm = funcFai(m);
-    u_int64_t u, v;
-    if(!linearEquitionM(k, fm, 1, &u, &v))
-        return 0;
+    u_int64_t u, fm = funcFai(m);
+    if((0 == k) || (0 == fm))
+        return -1;
+    if(1 != gcd(k, fm))
+        return -1;
+    u = powerMode(k, fm, funcFai(fm) - 1);
     return powerMode(b, m, u);
 }

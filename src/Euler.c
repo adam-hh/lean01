@@ -18,9 +18,10 @@ u_int64_t funcFai(u_int64_t x)
         j = 1;//power counter
         while(0 != *p)
         {
-            tmp[0][i] = *(p++);//fact
+            if(0 == tmp[0][i])
+                tmp[0][i] = *p;//fact
             tmp[1][i] = j;//power
-            if(*p == tmp[0][i])//comp *(p+1) and *p
+            if(*(++p) == tmp[0][i])//comp *(p+1) and *p
                 tmp[1][i] = ++j;//power + 1
             else{
                 i++;//arrary index + 1
@@ -34,7 +35,11 @@ u_int64_t funcFai(u_int64_t x)
             if(1 == tmp[1][i])//power == 1
                 result *= (tmp[0][i] - 1);//math:fai(p) = p-1 when p is a prime
             else//power > 1
-                result *= (powu64(tmp[0][i], tmp[1][i]) - powu64(tmp[0][i], tmp[1][i] - 1));//math:fai(p^k) = p^k - p^(k-1) p is prime
+            {
+                result *= (tmp[0][i] - 1);//math:fai(p^k) = p^k - p^(k-1) p is prime
+                while(1 != tmp[1][i]--)
+                    result *= tmp[0][i];
+            }
             i++;
         }
         return result;

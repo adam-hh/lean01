@@ -41,12 +41,14 @@ void createpTable()
     pTable[0] = 2;
     pTable[1] = 3;
     p = 2;//counter of pTable, start from 2
-    for(i = 4; i <= PRIMEUPL; i++)//i is a number to be test
+    for(i = 5; i <= PRIMEUPL; i++)//i is a number to be test
     {
+        if(!(i & 0x01))
+            continue;
         tag = 0;
-        for(j = 2; j <= sqrt(i); j++)//j is a prime fact to be test
+        for(j = 1; (pTable[j] != 0) && (pTable[j] <= sqrt(i)); j++)
         {
-            if(0 == (i % j)){
+            if(0 == (i % pTable[j])){
                 tag = 1;//i is not a prime number
                 break;
             }
