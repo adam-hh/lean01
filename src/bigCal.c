@@ -1,5 +1,6 @@
 #include "commonHeader.h"
 #include <string.h>
+int multBigNum(u8 *a, u8 *b);
 /*
 a[BLOCKSISE * 2] + b[BLOCKSIXE * 2] -> a
 */
@@ -20,6 +21,15 @@ static inline int addBigNum(u8 *a, u8 *b)
     } while (cnt++ != ((BLOCKSIZE * 2) / 4) - 1);//when BLOCKSIZE is 128, this 33 loops
     return *((u32*)a);
 }
+static inline int addReverse(u8 *a)
+{
+    u8 one[BLOCKSIZE * 2] ={0};
+    *((u32*)one + ((BLOCKSIZE * 2) / 4) - 1) = 1;
+    for(int i = BLOCKSIZE; i < BLOCKSIZE * 2; i++)
+        *(a + i) = ~(*(a + i));//tmp = ~b
+    addBigNum(a, one);//tmp = -b
+    *(a + BLOCKSIZE -1) = 0;//resolve 0 sign problem
+}
 static inline int subBigNum(u8 *a, u8 *b)
 {
     u8 tmp[BLOCKSIZE * 2] = {0}, one[BLOCKSIZE * 2] = {0};
@@ -27,9 +37,13 @@ static inline int subBigNum(u8 *a, u8 *b)
     for(int i = BLOCKSIZE; i < BLOCKSIZE * 2; i++)
         tmp[i] = ~(*(b + i));//tmp = ~b
     addBigNum(tmp, one);//tmp = -b
-    tmp[BLOCKSIZE -1] = 0;//resolve 0 sign problem
+    //tmp[BLOCKSIZE -1] = 0;//resolve 0 sign problem
+    *((u32*)tmp + ((BLOCKSIZE * 2) / 8 - 1)) = 0;
     return addBigNum(a, tmp);//a=a-b
 }
+/*
+division
+*/
 static inline int modBigNumam(u8 *a, u8 *m, u8 *r)//a % m, a and m are BLOCKSIZE wide
 {
     u32 *rptr = (u32*)(r + BLOCKSIZE), *mptr = (u32*)(m + BLOCKSIZE);
@@ -57,6 +71,114 @@ static inline int modBigNumam(u8 *a, u8 *m, u8 *r)//a % m, a and m are BLOCKSIZE
     }
     return 1;
 }
+int modBigNumanWithQuo(u8 *a, u8 *m, u8 *r, u8 *quo)
+{
+    u32 *rptr = (u32*)(r + BLOCKSIZE), *mptr = (u32*)(m + BLOCKSIZE);
+    u8 one[BLOCKSIZE * 2] = {0};
+    *((u32*)one + ((BLOCKSIZE * 2) / 4) - 1) = 1;//1
+    memset(quo, 0, BLOCKSIZE * 2);
+    if(a != r)
+        memcpy(r, a, BLOCKSIZE * 2);
+    while(*(rptr++) == *(mptr++))//skip equal part, may outof band
+    {
+        if((rptr - (u32*)(r)) == (BLOCKSIZE * 2) / 4)
+            break;
+    }
+    if(*(--rptr) >= *(--mptr))
+    {
+        do
+        {
+            subBigNum(r, m);
+            addBigNum(quo, one);//quo++
+            *((u32*)r + (BLOCKSIZE / 4) - 1) = 0;//set addtional over flow bits to 0, aligin to u32
+            rptr = (u32*)(r + BLOCKSIZE);
+            mptr = (u32*)(m + BLOCKSIZE);
+            while(*(rptr++) == *(mptr++))
+            {
+                if((rptr - (u32*)(r)) == (BLOCKSIZE * 2) / 4)
+                    break;
+            }
+        } while (*(--rptr) >= *(--mptr));     
+    }
+    return 1;
+}
+/*
+gcd
+*/
+int gcdBigNum(u8 *a, u8 *b, u8 *gcd)
+{
+    u8 aar[BLOCKSIZE * 2] = {0}, bar[BLOCKSIZE * 2] = {0};
+    memcpy(aar, a, BLOCKSIZE * 2);
+    memcpy(bar, b, BLOCKSIZE * 2);
+    u8 *bptr = bar, tag = 1;
+    while(tag)
+    {
+        while(0 == *(bptr++)){
+            if(bptr - bar == BLOCKSIZE * 2) {//b == 0
+                tag = 0;
+                break;
+            }
+            continue;
+        }
+        bptr = bar;
+        if(tag)
+        {
+            modBigNumam(aar, bar, gcd);
+            memcpy(aar, bar, BLOCKSIZE * 2);
+            memcpy(bar, gcd, BLOCKSIZE * 2);
+        }
+    }
+    memcpy(gcd, aar, BLOCKSIZE * 2);
+}
+int modMROneEquition(u8 *a, u8 *m, u8 *solution)
+{
+    u8 aar[BLOCKSIZE * 2] = {0}, mar[BLOCKSIZE * 2] = {0}, gcd[BLOCKSIZE * 2] = {0}, qar[BLOCKSIZE * 2] = {0};
+    memcpy(aar, a, BLOCKSIZE * 2);
+    memcpy(mar, m, BLOCKSIZE * 2);
+    u8 *mptr = mar, tag = 1;
+    u8 sar[BLOCKSIZE * 2] = {0}, var[BLOCKSIZE * 2] = {0};
+    *((u32*)solution + ((BLOCKSIZE * 2) / 4) - 1) = 1;//x=1;
+    while(tag)
+    {
+        while(0 == *(mptr++)){
+            if(mptr - mar == BLOCKSIZE * 2) {//b == 0
+                tag = 0;
+                break;
+            }
+            continue;
+        }
+        mptr = mar;
+        if(tag)
+        {
+            modBigNumanWithQuo(aar, mar, gcd, qar);
+            memcpy(sar, solution, BLOCKSIZE * 2);//s=x
+            if(*((int*)var + ((BLOCKSIZE * 2) / 8)) >= 0)
+            {
+                multBigNum(qar, var);
+                subBigNum(sar, qar);//s=x-q*v
+                *((u32*)sar + ((BLOCKSIZE * 2) / 8) - 1) = 0;//remove overflow part if exists
+                memcpy(solution, var, BLOCKSIZE * 2);//x=v
+                memcpy(var, sar, BLOCKSIZE * 2);//v=s
+            }
+            else
+            {
+                addReverse(var);
+                multBigNum(qar, var);
+                addBigNum(sar, qar);
+                *((u32*)sar + ((BLOCKSIZE * 2) / 8) - 1) = 0;//remove overflow part if exists
+                memcpy(solution, var, BLOCKSIZE * 2);//x=v
+                memcpy(var, sar, BLOCKSIZE * 2);//v=s
+            }
+            memcpy(aar, mar, BLOCKSIZE * 2);
+            memcpy(mar, gcd, BLOCKSIZE * 2);
+        }
+    }
+    if(*((u32*)aar + ((BLOCKSIZE * 2) / 4) - 1) != 1)//gcd != 1
+        return -1;
+    modBigNumam(solution, m, solution);
+    return 1;
+}
+
 /*
 a[BLOCKSIZE * 2] * b[BLOCKSIZE * 2] -> a
 */
