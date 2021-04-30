@@ -54,7 +54,7 @@ u_int64_t modU64(u_int64_t a, u_int64_t b, u_int64_t m)
     do
     {
         rval.a1 = 0;
-        rval.a2 = (1 % m) + ((-1) % m);
+        rval.a2 = (1 % m) + ((-1) % m);//m != -1
         a128.a2 %= m;
         b128.a2 %= m;
         multU64TU128(&rval, &a128);
