@@ -265,7 +265,7 @@ int multBigNum(u8 *a, u8 *b)
         if((BLOCKSIZE / 4) == cntb)
             break;
     }
-    if((BLOCKSIZE / 4 == cnt) || (BLOCKSIZE / 4 == cnt2)){//a=0 or b=0, a*b=0, return
+    if((BLOCKSIZE / 4 == cnta) || (BLOCKSIZE / 4 == cntb)){//a=0 or b=0, a*b=0, return
         memset(a, 0, BLOCKSIZE * 2);
         return 0;
     }
