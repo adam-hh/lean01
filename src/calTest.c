@@ -8,6 +8,7 @@ extern int modBigNum(u8 *a, u8 *b, u8 *m, u8 *r);
 extern int modBigNumanWithQuo(u8 *a, u8 *m, u8 *r, u8 *quo);
 extern int gcdBigNum(u8 *a, u8 *b, u8 *gcd);
 extern int modMROneEquition(u8 *a, u8 *m, u8 *solution);
+extern int powerModeBigNum(u8 *a, u8 *m, u8 *k, u8 *r);
 
 int main()
 {
@@ -49,9 +50,10 @@ int main()
     //modBigNum(x, y, z, remainder);
     //modBigNumanWithQuo(y, x, remainder, q);
     //gcdBigNum(x, y, remainder);
-    modMROneEquition(x, y, remainder);
+    //modMROneEquition(x, y, remainder);
+    powerModeBigNum(x, y, p1, remainder);
     n = decDisp(remainder, &str);
-    printf("xk = 1 (mod y) is\n%s\n", str + n);
+    printf("x^%u (mod y) is\n%s\n", *((u32*)p1 + (BLOCKSIZE * 2) / 4 - 1), str + n);
     free(str);
     //n = decDisp(q, &str);
     //printf("y%%x quotient is\n%s\n", str + n);

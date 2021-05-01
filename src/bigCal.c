@@ -1,6 +1,7 @@
 #include "commonHeader.h"
 #include <string.h>
 int multBigNum(u8 *a, u8 *b);
+int modBigNum(u8 *a, u8 *b, u8 *m, u8 *r);
 /*
 a[BLOCKSISE * 2] + b[BLOCKSIXE * 2] -> a
 */
@@ -178,6 +179,67 @@ int modMROneEquition(u8 *a, u8 *m, u8 *solution)
     modBigNumam(solution, m, solution);
     return 1;
 }
+/*
+a^k % m = r
+*/
+int powerModeBigNum(u8 *a, u8 *m, u8 *k, u8 *r)
+{
+    u8 rem[BLOCKSIZE * 2] = {0}, *remptr, key[BLOCKSIZE * 2] = {0};
+    remptr = rem;
+    modBigNumam(a, m, rem);
+    while(0 == *(remptr++))
+    {
+        if((remptr - rem) == BLOCKSIZE * 2)
+            break;        
+    }
+    if((remptr - rem) == BLOCKSIZE * 2)
+        return 0;//a % m == 0
+    memset(rem, 0, BLOCKSIZE * 2);
+    *((u32*)rem + ((BLOCKSIZE * 2) / 4) -1) = 1;//rem = 1
+    //*((u32*)rem + (BLOCKSIZE / 4) = 1;//rem = 1
+    u32 *kptr = (u32*)key + BLOCKSIZE / 4, cnt = 0, cnt2 = BLOCKSIZE / 4;
+    memcpy(key, k, BLOCKSIZE * 2);
+    while(0 == *(kptr++))//skip leading zeros
+    {
+        cnt2--;
+        if(0 == cnt2)
+            break;
+    }//
+    if(0 == cnt2)
+        return -1;//k=0
+    kptr = (u32*)key + (BLOCKSIZE * 2) / 4 - 1;
+    do
+    {
+        if(1 != cnt2)
+        {
+            if(1 == *kptr & 0x01){
+                modBigNum(a, rem, m, rem);//a*rem % m -> rem
+            }
+            modBigNum(a, a, m, a);//a*a % m -> a
+            *kptr >>= 1;
+            if(0 == (++cnt) % 32){
+                kptr--;
+                cnt2--;
+            }
+            continue;
+        }
+        else if(*kptr >= 1)
+        {
+            if(1 == *kptr & 0x01){
+                modBigNum(a, rem, m, rem);//a*rem % m -> rem
+            }
+            modBigNum(a, a, m, a);//a*a % m -> a
+            *kptr >>= 1;
+        }
+        else
+        {
+            break;
+        }
+    }while(1);
+
+    memcpy(r, rem, BLOCKSIZE * 2);
+    return 1;
+}
 
 /*
 a[BLOCKSIZE * 2] * b[BLOCKSIZE * 2] -> a
@@ -188,10 +250,30 @@ int multBigNum(u8 *a, u8 *b)
     register u64 a1, b1;//a1,b1 to store the u32 data, so the multiplication can not overflow. 
     u8 val[BLOCKSIZE * 2] = {0}, tmp[BLOCKSIZE * 2] = {0};//val[] to store the final result, tmp[] to store the middle result
     register u32 *ptrVal = (u32*)val, *ptrTmp = (u32*)tmp;
-    pa += (((BLOCKSIZE * 2) / 4) - 1);//when BLOCKSIZE is 128, this is 63. make pa to point to the last u32 data.
-    pb += (((BLOCKSIZE * 2) / 4) - 1);//make pb to point to the last u32 data
+    pa += (BLOCKSIZE / 4);
+    pb += (BLOCKSIZE / 4);
     ptrVal += (((BLOCKSIZE * 2) / 4) - 1);
     ptrTmp += (((BLOCKSIZE * 2) / 4) - 1);
+    u32 cnta = 0, cntb = 0;//leading zeros counters
+    while(0 == *(pa++)){//skip leading zeros
+        cnta++;
+        if((BLOCKSIZE / 4) == cnta)
+            break;
+    }
+    while(0 == *(pb++)){
+        cntb++;
+        if((BLOCKSIZE / 4) == cntb)
+            break;
+    }
+    if((BLOCKSIZE / 4 == cnt) || (BLOCKSIZE / 4 == cnt2)){//a=0 or b=0, a*b=0, return
+        memset(a, 0, BLOCKSIZE * 2);
+        return 0;
+    }
+    cnt = cnta;//inner loop conter
+    cnt2 = cntb;//outter loop conter
+    pa = (u32*)a + (((BLOCKSIZE * 2) / 4) - 1);//when BLOCKSIZE is 128, this is 63. make pa to point to the last u32 data.
+    pb = (u32*)b + (((BLOCKSIZE * 2) / 4) - 1);//make pb to point to the last u32 data
+
     do
     {
         do
@@ -202,11 +284,11 @@ int multBigNum(u8 *a, u8 *b)
             a1 += multOverflow;//no overflow in math   
             multOverflow = (a1 >> 32);//get the carry data from the high 32 bits
             *(ptrTmp--) = ((a1 << 32) >> 32);//get a middle result data from the low 32 bits
-        } while (cnt++ != ((BLOCKSIZE / 4) - 1));//when BLOCKSISE is 128, this 32 loops
+        } while (cnt++ != ((BLOCKSIZE / 4) - 1));//when BLOCKSISE is 128, BLOCKSIZE / 4 -cnta loops
         *ptrTmp = (a1 >> 32);//fill the last overflow u32 data from the high 32 bits of a1
         multOverflow = 0;//reset multOverflow
-        pa += cnt;//reset pa
-        ptrTmp += cnt;//reset ptrTmp
+        pa = (u32*)a + ((BLOCKSIZE * 2) / 4) - 1;//reset pa
+        ptrTmp += (BLOCKSIZE / 4) -cnta;//reset ptrTmp with relative move
         do
         {
             *ptrVal += (*ptrTmp + addOverflow);//get a final result data, addional overflow must be deal with
@@ -216,16 +298,13 @@ int multBigNum(u8 *a, u8 *b)
                 addOverflow = 0;
             ptrVal--;
             ptrTmp--;
-        } while (cnt-- != 0);//1 more loops, when BLOCKSISE is 128, this 33 loops
-        cnt = 0;//reset cnt
-        ptrVal += ((BLOCKSIZE / 4) + 1);//reset ptrVal
-        ptrTmp += ((BLOCKSIZE / 4) + 1);//reset ptrTmp
+        } while (cnt-- != cnta);//1 more loops, when BLOCKSISE is 128, BLOCKSIZE / 4 -cnta +1 loops
+        cnt++;//reset cnt,cnt=cnta
+        ptrVal += (BLOCKSIZE / 4) - cnta;//reset ptrVal with relative move
+        ptrTmp += (BLOCKSIZE / 4) - cnta;//reset ptrTmp
         pb--;//pb move forward
-        ptrVal--;
-        ptrTmp--;
-    } while(cnt2++ != ((BLOCKSIZE / 4) - 1));//when BLOCKSISE is 128, this 32 loops
-    for(int i = 0; i < (BLOCKSIZE * 2); i++)
-        *(a + i) = val[i];//fill back final result to a[]
+    } while(cnt2++ != ((BLOCKSIZE / 4) - 1));//when BLOCKSISE is 128, BLOCKSIZE / 4 -cnt2 loops
+    memcpy(a, val, BLOCKSIZE * 2);
     return *(int*)a;//a int data returned.the sign bit is in it.
 }
 /*
