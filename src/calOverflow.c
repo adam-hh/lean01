@@ -1,4 +1,5 @@
 #include <inttypes.h>
+#include <stdlib.h>
 /*
 Determine whether arguments can be added without overflow
 */

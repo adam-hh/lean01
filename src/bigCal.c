@@ -1,5 +1,6 @@
 #include "commonHeader.h"
 #include <string.h>
+#include <ctype.h>
 int multBigNum(u8 *a, u8 *b);
 int modBigNum(u8 *a, u8 *b, u8 *m, u8 *r);
 /*
@@ -10,8 +11,13 @@ static inline int addBigNum(u8 *a, u8 *b)
     register u32 *pa = (u32*)a, *pb = (u32*)b, cnt = 0, addOverflow = 0;
     pa += (((BLOCKSIZE * 2) / 4) - 1);
     pb += (((BLOCKSIZE * 2) / 4) - 1);
-    do
+    while (cnt++ != ((BLOCKSIZE * 2) / 4) - 1)//when BLOCKSIZE is 128, this 64 loops
     {
+        if((!*pa) && (!*pb) && (!addOverflow)){
+            pa--;
+            pb--;
+            continue;
+        } 
         *pa += (*pb + addOverflow);
         if(((*pa - addOverflow) < *pb) || (*pa < addOverflow))//pa+pb overflow or pa+pb+addOverflow overflow
             addOverflow = 1;
@@ -19,7 +25,7 @@ static inline int addBigNum(u8 *a, u8 *b)
             addOverflow = 0;
         pa--;
         pb--;
-    } while (cnt++ != ((BLOCKSIZE * 2) / 4) - 1);//when BLOCKSIZE is 128, this 33 loops
+    }
     return *((u32*)a);
 }
 static inline int addReverse(u8 *a)
@@ -29,7 +35,7 @@ static inline int addReverse(u8 *a)
     for(int i = BLOCKSIZE; i < BLOCKSIZE * 2; i++)
         *(a + i) = ~(*(a + i));//tmp = ~b
     addBigNum(a, one);//tmp = -b
-    *(a + BLOCKSIZE -1) = 0;//resolve 0 sign problem
+    *((u32*)a + (BLOCKSIZE / 4) -1) = 0;//resolve -0 sign problem
 }
 static inline int subBigNum(u8 *a, u8 *b)
 {
@@ -38,209 +44,9 @@ static inline int subBigNum(u8 *a, u8 *b)
     for(int i = BLOCKSIZE; i < BLOCKSIZE * 2; i++)
         tmp[i] = ~(*(b + i));//tmp = ~b
     addBigNum(tmp, one);//tmp = -b
-    //tmp[BLOCKSIZE -1] = 0;//resolve 0 sign problem
-    *((u32*)tmp + ((BLOCKSIZE * 2) / 8 - 1)) = 0;
+    *((u32*)tmp + (BLOCKSIZE / 4) - 1) = 0;
     return addBigNum(a, tmp);//a=a-b
 }
-/*
-division
-*/
-static inline int modBigNumam(u8 *a, u8 *m, u8 *r)//a % m, a and m are BLOCKSIZE wide
-{
-    u32 *rptr = (u32*)(r + BLOCKSIZE), *mptr = (u32*)(m + BLOCKSIZE);
-    if(a != r)
-        memcpy(r, a, BLOCKSIZE * 2);
-    while(*(rptr++) == *(mptr++))//skip equal part, may outof band
-    {
-        if((rptr - (u32*)(r)) == (BLOCKSIZE * 2) / 4)
-            break;
-    }
-    if(*(--rptr) >= *(--mptr))
-    {
-        do
-        {
-            subBigNum(r, m);
-            *((u32*)r + (BLOCKSIZE / 4) - 1) = 0;//set addtional over flow bits to 0, aligin to u32
-            rptr = (u32*)(r + BLOCKSIZE);
-            mptr = (u32*)(m + BLOCKSIZE);
-            while(*(rptr++) == *(mptr++))
-            {
-                if((rptr - (u32*)(r)) == (BLOCKSIZE * 2) / 4)
-                    break;
-            }
-        } while (*(--rptr) >= *(--mptr));     
-    }
-    return 1;
-}
-int modBigNumanWithQuo(u8 *a, u8 *m, u8 *r, u8 *quo)
-{
-    u32 *rptr = (u32*)(r + BLOCKSIZE), *mptr = (u32*)(m + BLOCKSIZE);
-    u8 one[BLOCKSIZE * 2] = {0};
-    *((u32*)one + ((BLOCKSIZE * 2) / 4) - 1) = 1;//1
-    memset(quo, 0, BLOCKSIZE * 2);
-    if(a != r)
-        memcpy(r, a, BLOCKSIZE * 2);
-    while(*(rptr++) == *(mptr++))//skip equal part, may outof band
-    {
-        if((rptr - (u32*)(r)) == (BLOCKSIZE * 2) / 4)
-            break;
-    }
-    if(*(--rptr) >= *(--mptr))
-    {
-        do
-        {
-            subBigNum(r, m);
-            addBigNum(quo, one);//quo++
-            *((u32*)r + (BLOCKSIZE / 4) - 1) = 0;//set addtional over flow bits to 0, aligin to u32
-            rptr = (u32*)(r + BLOCKSIZE);
-            mptr = (u32*)(m + BLOCKSIZE);
-            while(*(rptr++) == *(mptr++))
-            {
-                if((rptr - (u32*)(r)) == (BLOCKSIZE * 2) / 4)
-                    break;
-            }
-        } while (*(--rptr) >= *(--mptr));     
-    }
-    return 1;
-}
-/*
-gcd
-*/
-int gcdBigNum(u8 *a, u8 *b, u8 *gcd)
-{
-    u8 aar[BLOCKSIZE * 2] = {0}, bar[BLOCKSIZE * 2] = {0};
-    memcpy(aar, a, BLOCKSIZE * 2);
-    memcpy(bar, b, BLOCKSIZE * 2);
-    u8 *bptr = bar, tag = 1;
-    while(tag)
-    {
-        while(0 == *(bptr++)){
-            if(bptr - bar == BLOCKSIZE * 2) {//b == 0
-                tag = 0;
-                break;
-            }
-            continue;
-        }
-        bptr = bar;
-        if(tag)
-        {
-            modBigNumam(aar, bar, gcd);
-            memcpy(aar, bar, BLOCKSIZE * 2);
-            memcpy(bar, gcd, BLOCKSIZE * 2);
-        }
-    }
-    memcpy(gcd, aar, BLOCKSIZE * 2);
-}
-int modMROneEquition(u8 *a, u8 *m, u8 *solution)
-{
-    u8 aar[BLOCKSIZE * 2] = {0}, mar[BLOCKSIZE * 2] = {0}, gcd[BLOCKSIZE * 2] = {0}, qar[BLOCKSIZE * 2] = {0};
-    memcpy(aar, a, BLOCKSIZE * 2);
-    memcpy(mar, m, BLOCKSIZE * 2);
-    u8 *mptr = mar, tag = 1;
-    u8 sar[BLOCKSIZE * 2] = {0}, var[BLOCKSIZE * 2] = {0};
-    *((u32*)solution + ((BLOCKSIZE * 2) / 4) - 1) = 1;//x=1;
-    while(tag)
-    {
-        while(0 == *(mptr++)){
-            if(mptr - mar == BLOCKSIZE * 2) {//b == 0
-                tag = 0;
-                break;
-            }
-            continue;
-        }
-        mptr = mar;
-        if(tag)
-        {
-            modBigNumanWithQuo(aar, mar, gcd, qar);
-            memcpy(sar, solution, BLOCKSIZE * 2);//s=x
-            if(*((int*)var + ((BLOCKSIZE * 2) / 8)) >= 0)
-            {
-                multBigNum(qar, var);
-                subBigNum(sar, qar);//s=x-q*v
-                *((u32*)sar + ((BLOCKSIZE * 2) / 8) - 1) = 0;//remove overflow part if exists
-                memcpy(solution, var, BLOCKSIZE * 2);//x=v
-                memcpy(var, sar, BLOCKSIZE * 2);//v=s
-            }
-            else
-            {
-                addReverse(var);
-                multBigNum(qar, var);
-                addBigNum(sar, qar);
-                *((u32*)sar + ((BLOCKSIZE * 2) / 8) - 1) = 0;//remove overflow part if exists
-                memcpy(solution, var, BLOCKSIZE * 2);//x=v
-                memcpy(var, sar, BLOCKSIZE * 2);//v=s
-            }
-            memcpy(aar, mar, BLOCKSIZE * 2);
-            memcpy(mar, gcd, BLOCKSIZE * 2);
-        }
-    }
-    if(*((u32*)aar + ((BLOCKSIZE * 2) / 4) - 1) != 1)//gcd != 1
-        return -1;
-    modBigNumam(solution, m, solution);
-    return 1;
-}
-/*
-a^k % m = r
-*/
-int powerModeBigNum(u8 *a, u8 *m, u8 *k, u8 *r)
-{
-    u8 rem[BLOCKSIZE * 2] = {0}, *remptr, key[BLOCKSIZE * 2] = {0};
-    remptr = rem;
-    modBigNumam(a, m, rem);
-    while(0 == *(remptr++))
-    {
-        if((remptr - rem) == BLOCKSIZE * 2)
-            break;        
-    }
-    if((remptr - rem) == BLOCKSIZE * 2)
-        return 0;//a % m == 0
-    memset(rem, 0, BLOCKSIZE * 2);
-    *((u32*)rem + ((BLOCKSIZE * 2) / 4) -1) = 1;//rem = 1
-    //*((u32*)rem + (BLOCKSIZE / 4) = 1;//rem = 1
-    u32 *kptr = (u32*)key + BLOCKSIZE / 4, cnt = 0, cnt2 = BLOCKSIZE / 4;
-    memcpy(key, k, BLOCKSIZE * 2);
-    while(0 == *(kptr++))//skip leading zeros
-    {
-        cnt2--;
-        if(0 == cnt2)
-            break;
-    }//
-    if(0 == cnt2)
-        return -1;//k=0
-    kptr = (u32*)key + (BLOCKSIZE * 2) / 4 - 1;
-    do
-    {
-        if(1 != cnt2)
-        {
-            if(1 == *kptr & 0x01){
-                modBigNum(a, rem, m, rem);//a*rem % m -> rem
-            }
-            modBigNum(a, a, m, a);//a*a % m -> a
-            *kptr >>= 1;
-            if(0 == (++cnt) % 32){
-                kptr--;
-                cnt2--;
-            }
-            continue;
-        }
-        else if(*kptr >= 1)
-        {
-            if(1 == *kptr & 0x01){
-                modBigNum(a, rem, m, rem);//a*rem % m -> rem
-            }
-            modBigNum(a, a, m, a);//a*a % m -> a
-            *kptr >>= 1;
-        }
-        else
-        {
-            break;
-        }
-    }while(1);
-
-    memcpy(r, rem, BLOCKSIZE * 2);
-    return 1;
-}
-
 /*
 a[BLOCKSIZE * 2] * b[BLOCKSIZE * 2] -> a
 */
@@ -255,12 +61,14 @@ int multBigNum(u8 *a, u8 *b)
     ptrVal += (((BLOCKSIZE * 2) / 4) - 1);
     ptrTmp += (((BLOCKSIZE * 2) / 4) - 1);
     u32 cnta = 0, cntb = 0;//leading zeros counters
-    while(0 == *(pa++)){//skip leading zeros
+    while(0 == *pa){//skip leading zeros
+        pa++;
         cnta++;
         if((BLOCKSIZE / 4) == cnta)
             break;
     }
-    while(0 == *(pb++)){
+    while(0 == *pb){
+        pb++;
         cntb++;
         if((BLOCKSIZE / 4) == cntb)
             break;
@@ -308,6 +116,305 @@ int multBigNum(u8 *a, u8 *b)
     return *(int*)a;//a int data returned.the sign bit is in it.
 }
 /*
+division
+*/
+int sDivideBigNumWithQuo(u8 *a, u8 *b32, u8 *r32, u8 *q)//special division when b32 is a 32bits wide number
+{
+    u8 quo[BLOCKSIZE * 2] = {0};
+    u32 *qptr = (u32*)quo + (BLOCKSIZE / 4), *b32ptr = (u32*)b32, b32val;
+    u64 rem = 0, overFlow = 0;
+    while(0 == *b32ptr){//skip leading zeros
+        b32ptr++;
+        if(b32ptr - (u32*)b32 == (BLOCKSIZE * 2) / 4 - 1)//test the non-zero bits
+            break;
+    }
+    if(b32ptr - (u32*)b32 != (BLOCKSIZE * 2) / 4 - 1)//if b32 is not a 32bits data
+        return -1;
+    memcpy(quo, a, BLOCKSIZE * 2);//copy a to quo
+    while(0 == *qptr){//skip leading zeros
+        qptr++;
+        if((qptr - (u32*)quo) == (BLOCKSIZE * 2) / 4)
+            break;
+    }
+    if((qptr - (u32*)quo) == (BLOCKSIZE * 2) / 4)//divided number is 0
+        return 0;
+    rem = *qptr;//divided number
+    b32val = *b32ptr;//avoid too many times of indirect reference to improve performance
+    if(0 == b32val)//divide number is 0
+        return -1;
+    do
+    {
+        rem = *qptr + overFlow;
+        *qptr++ = rem / b32val;
+        if(qptr - (u32*)quo == (BLOCKSIZE * 2) / 4){
+            rem %= b32val;
+            break;
+        }
+        overFlow = (rem % b32val) << 32;
+    } while (1);
+    memcpy(q, quo, BLOCKSIZE * 2);
+    *((u32*)r32 + (BLOCKSIZE * 2) / 4 -1) = rem;
+    return 1;
+}
+int sDivideBigNum(u8 *a, u8 *b32, u8 *r32)//special division when b32 is a 32bits wide number, without quotient output
+{
+    u32 *aptr = (u32*)a + (BLOCKSIZE / 4), *b32ptr = (u32*)b32, b32val;
+    u64 rem = 0, overFlow = 0;
+    while(0 == *b32ptr){//skip leading zeros
+        b32ptr++;
+        if(b32ptr - (u32*)b32 == (BLOCKSIZE * 2) / 4 - 1)//test the non-zero bits
+            break;
+    }
+    if(b32ptr - (u32*)b32 != (BLOCKSIZE * 2) / 4 - 1)//if b32 is not a 32bits data
+        return -1;
+    while(0 == *aptr){//skip leading zeros
+        aptr++;
+        if((aptr - (u32*)a) == (BLOCKSIZE * 2) / 4)
+            break;
+    }
+    if((aptr - (u32*)a) == (BLOCKSIZE * 2) / 4)//divided number is 0
+        return 0;
+    rem = *aptr;//divided number
+    b32val = *b32ptr;//avoid too many times of indirect reference to improve performance
+    if(0 == b32val)//divide number is 0
+        return -1;
+    do
+    {
+        rem = *(aptr++) + overFlow;
+        if(aptr - (u32*)a == (BLOCKSIZE * 2) / 4){
+            rem %= b32val;
+            break;
+        }
+        overFlow = (rem % b32val) << 32;
+    } while (1);
+    *((u32*)r32 + (BLOCKSIZE * 2) / 4 -1) = rem;
+    return 1;
+}
+static inline int modBigNumam(u8 *a, u8 *m, u8 *r)//a % m, a and m are BLOCKSIZE wide
+{
+    u32 *rptr = (u32*)(r + BLOCKSIZE), *mptr = (u32*)(m + BLOCKSIZE);
+    while(0 == *mptr){
+        mptr++;
+        if(mptr - (u32*)m == (BLOCKSIZE * 2) / 4 - 1)
+            break;
+    }
+    if(0 == *mptr)
+        return -1;
+    if(mptr - (u32*)m == (BLOCKSIZE * 2) / 4 - 1){//m is u32 bits width and is not 0
+        sDivideBigNum(a, m, r);//use special division
+        return 1;
+    }
+    
+    mptr = (u32*)(m + BLOCKSIZE);
+    if(a != r)
+        memcpy(r, a, BLOCKSIZE * 2);
+    while(*(rptr++) == *(mptr++))//skip equal part, may outof band
+    {
+        if((rptr - (u32*)(r)) == (BLOCKSIZE * 2) / 4)
+            break;
+    }
+    if(*(--rptr) >= *(--mptr))
+    {
+        do
+        {
+            subBigNum(r, m);
+            *((u32*)r + (BLOCKSIZE / 4) - 1) = 0;//set addtional over flow bits to 0, aligin to u32
+            rptr = (u32*)(r + BLOCKSIZE);
+            mptr = (u32*)(m + BLOCKSIZE);
+            while(*(rptr++) == *(mptr++))
+            {
+                if((rptr - (u32*)(r)) == (BLOCKSIZE * 2) / 4)
+                    break;
+            }
+        } while (*(--rptr) >= *(--mptr));     
+    }
+    return 1;
+}
+int modBigNumanWithQuo(u8 *a, u8 *m, u8 *r, u8 *quo)
+{
+    u32 *rptr = (u32*)(r + BLOCKSIZE), *mptr = (u32*)(m + BLOCKSIZE);
+    u8 one[BLOCKSIZE * 2] = {0};
+    *((u32*)one + ((BLOCKSIZE * 2) / 4) - 1) = 1;//1
+    while(0 == *mptr){//skip leading zeros
+        mptr++;
+        if(mptr - (u32*)m == (BLOCKSIZE * 2) / 4 - 1)
+            break;
+    }
+    if(mptr - (u32*)m == (BLOCKSIZE * 2) / 4 - 1){//test if m is a small u32 data
+        if(0 == *mptr)
+            return -1;
+        else{
+            sDivideBigNumWithQuo(a, m, r, quo);//use special division
+            return 1;
+        }
+    }
+    memset(quo, 0, BLOCKSIZE * 2);
+    if(a != r)
+        memcpy(r, a, BLOCKSIZE * 2);
+    while(*(rptr++) == *(mptr++))//skip equal part, may outof band
+    {
+        if((rptr - (u32*)(r)) == (BLOCKSIZE * 2) / 4)
+            break;
+    }
+    if(*(--rptr) >= *(--mptr))
+    {
+        do
+        {
+            subBigNum(r, m);
+            addBigNum(quo, one);//quo++
+            *((u32*)r + (BLOCKSIZE / 4) - 1) = 0;//set addtional over flow bits to 0, aligin to u32
+            rptr = (u32*)(r + BLOCKSIZE);
+            mptr = (u32*)(m + BLOCKSIZE);
+            while(*(rptr++) == *(mptr++))
+            {
+                if((rptr - (u32*)(r)) == (BLOCKSIZE * 2) / 4)
+                    break;
+            }
+        } while (*(--rptr) >= *(--mptr));     
+    }
+    return 1;
+}
+/*
+gcd
+*/
+int gcdBigNum(u8 *a, u8 *b, u8 *gcd)
+{
+    u8 aar[BLOCKSIZE * 2] = {0}, bar[BLOCKSIZE * 2] = {0};
+    memcpy(aar, a, BLOCKSIZE * 2);
+    memcpy(bar, b, BLOCKSIZE * 2);
+    u8 *bptr = bar, tag = 1;
+    while(tag)
+    {
+        while(0 == *bptr){
+            bptr++;
+            if(bptr - bar == BLOCKSIZE * 2) {//b == 0
+                tag = 0;
+                break;
+            }
+            continue;
+        }
+        bptr = bar;
+        if(tag)
+        {
+            modBigNumam(aar, bar, gcd);
+            memcpy(aar, bar, BLOCKSIZE * 2);
+            memcpy(bar, gcd, BLOCKSIZE * 2);
+        }
+    }
+    memcpy(gcd, aar, BLOCKSIZE * 2);
+}
+int modMROneEquition(u8 *a, u8 *m, u8 *solution)
+{
+    u8 aar[BLOCKSIZE * 2] = {0}, mar[BLOCKSIZE * 2] = {0}, gcd[BLOCKSIZE * 2] = {0}, qar[BLOCKSIZE * 2] = {0};
+    memcpy(aar, a, BLOCKSIZE * 2);
+    memcpy(mar, m, BLOCKSIZE * 2);
+    u8 *mptr = mar, tag = 1;
+    u8 sar[BLOCKSIZE * 2] = {0}, var[BLOCKSIZE * 2] = {0};
+    *((u32*)solution + ((BLOCKSIZE * 2) / 4) - 1) = 1;//x=1;
+    while(tag)
+    {
+        while(0 == *mptr){
+            if((++mptr) - mar == BLOCKSIZE * 2) {//b == 0
+                tag = 0;
+                break;
+            }
+            continue;
+        }
+        mptr = mar;
+        if(tag)
+        {
+            modBigNumanWithQuo(aar, mar, gcd, qar);
+            memcpy(sar, solution, BLOCKSIZE * 2);//s=x
+            if(*((int*)var + ((BLOCKSIZE * 2) / 8)) >= 0)
+            {
+                multBigNum(qar, var);
+                subBigNum(sar, qar);//s=x-q*v
+                *((u32*)sar + ((BLOCKSIZE * 2) / 8) - 1) = 0;//remove overflow part if exists
+                memcpy(solution, var, BLOCKSIZE * 2);//x=v
+                memcpy(var, sar, BLOCKSIZE * 2);//v=s
+            }
+            else
+            {
+                addReverse(var);
+                multBigNum(qar, var);
+                addBigNum(sar, qar);
+                *((u32*)sar + ((BLOCKSIZE * 2) / 8) - 1) = 0;//remove overflow part if exists
+                memcpy(solution, var, BLOCKSIZE * 2);//x=v
+                memcpy(var, sar, BLOCKSIZE * 2);//v=s
+            }
+            memcpy(aar, mar, BLOCKSIZE * 2);
+            memcpy(mar, gcd, BLOCKSIZE * 2);
+        }
+    }
+    if(*((u32*)aar + ((BLOCKSIZE * 2) / 4) - 1) != 1)//gcd != 1
+        return -1;
+    modBigNumam(solution, m, solution);
+    return 1;
+}
+/*
+a^k % m = r
+*/
+int powerModeBigNum(u8 *a, u8 *m, u8 *k, u8 *r)
+{
+    u8 rem[BLOCKSIZE * 2] = {0}, *remptr, key[BLOCKSIZE * 2] = {0};
+    remptr = rem;
+    modBigNumam(a, m, rem);
+    while(0 == *remptr)
+    {
+        if(((++remptr) - rem) == BLOCKSIZE * 2)
+            break;
+    }
+    if((remptr - rem) == BLOCKSIZE * 2)
+        return 0;//a % m == 0
+    memset(rem, 0, BLOCKSIZE * 2);
+    *((u32*)rem + ((BLOCKSIZE * 2) / 4) -1) = 1;//rem = 1
+    u32 *kptr = (u32*)key + BLOCKSIZE / 4, cnt = 0, cnt2 = BLOCKSIZE / 4;
+    memcpy(key, k, BLOCKSIZE * 2);
+    while(0 == *kptr)//skip leading zeros
+    {
+        kptr++;
+        cnt2--;
+        if(0 == cnt2)
+            break;
+    }//
+    if(0 == cnt2)
+        return -1;//k=0
+    kptr = (u32*)key + (BLOCKSIZE * 2) / 4 - 1;
+    do
+    {
+        if(1 != cnt2)
+        {
+            if(1 == *kptr & 0x01){
+                modBigNum(a, rem, m, rem);//a*rem % m -> rem
+            }
+            modBigNum(a, a, m, a);//a*a % m -> a
+            *kptr >>= 1;
+            if(0 == (++cnt) % 32){
+                kptr--;
+                cnt2--;
+            }
+            continue;
+        }
+        else if(*kptr >= 1)
+        {
+            if(1 == *kptr & 0x01){
+                modBigNum(a, rem, m, rem);//a*rem % m -> rem
+            }
+            modBigNum(a, a, m, a);//a*a % m -> a
+            *kptr >>= 1;
+        }
+        else
+        {
+            break;
+        }
+    }while(1);
+
+    memcpy(r, rem, BLOCKSIZE * 2);
+    return 1;
+}
+
+
+/*
 (a*b)%m, put the remainder to r
 */
 int modBigNum(u8 *a, u8 *b, u8 *m, u8 *r)
@@ -322,9 +429,11 @@ int modBigNum(u8 *a, u8 *b, u8 *m, u8 *r)
     multBigNum(product, b);//a*b -> product
     do
     {
-        while(0 == *(p++))//skip leading zeros
-            ;
-        if((p - product - 1) >= BLOCKSIZE)
+        while(0 == *p){//skip leading zeros
+            if((++p) - product == BLOCKSIZE)
+                break;
+        }
+        if(p - product == BLOCKSIZE)
         {
             modBigNumam(product, m, r);
             break;//loop break condition
@@ -358,8 +467,7 @@ int decDisp(u8 *src, u8 **des)
     *(*des + (BLOCKSIZE * 6)) = 0;
     desptr = *des + BLOCKSIZE * 6 -1;
 
-    for(int i = 0; i < BLOCKSIZE * 2; i++)
-        divided[i] = *(src + i);   
+    memcpy(divided, src, BLOCKSIZE * 2);
     cnt = 0;
     do
     {
@@ -391,4 +499,103 @@ int decDisp(u8 *src, u8 **des)
     } while (1);
 
     return desptr - *des + 1;//return number of leading zeros
+}
+/*
+digits string to number
+*/
+int StringToNumber(u8 *src, u8 *des)
+{
+    u32 slen = strlen(src);
+    if(slen > BLOCKSIZE * 2)//conservative estimate
+        return -1;
+    u32 rem = 0, rem2 = 0, *dptr;
+    u8 sar[slen], *sptr;
+    sptr = sar + slen -1;
+    memcpy(sar, src, slen);
+    while(sptr != sar - 1){
+        if(isdigit(*sptr))
+            *sptr-- -= 0x30;
+        else
+            return -1;//illegal src string contains non digit symbol
+    }
+    sptr = sar;//sptr point to the start position of sar 
+    dptr = (u32*)des + (BLOCKSIZE * 2 / 4)- 1;//dptr point to the end position of des
+    u32 cnt = 0;
+    do
+    {
+        while(0 == *sptr){//skip leading zeros
+            sptr++;
+            if(sptr - sar == slen)//sar equals 0
+                break;
+        }
+        if(sptr - sar == slen)//outer loop break condition is sar eqauls 0
+            break;
+        do
+        {
+            rem2 = (rem + *sptr) & 0x01;//divide 2 remainder
+            *sptr = (rem + *sptr) >> 1;//divide 2 quotient
+            rem = rem2;
+            if((++sptr) - sar == slen)
+                break;//inner loop break condition is sar traversal finished
+            if(rem)
+                rem = 10;//wierd
+        } while (1);
+        if(rem)
+            *dptr += (rem << cnt);//get one bit store to des
+        rem = 0;//reset rem
+        if(32 == ++cnt){
+            dptr--;//move forward to higher position
+            if(dptr == (u32*)des + (BLOCKSIZE / 4) - 1)//out of band
+                return -1;
+            cnt = 0;//reset cnt
+        }
+        sptr = sar;//reset sptr
+    } while (1);
+    return 0;
+}
+/*
+number to digits string
+*/
+int NumberToString(u8 *src, u8 *des)
+{
+    u8 quo[BLOCKSIZE * 2] = {0}, divided[BLOCKSIZE * 2] = {0};//arrarys to store mid value of calculate process, quo is quotient, divided is divided numbers
+    u32 *qptr = (u32*)quo, *dptr = (u32*)divided;//pointers for traversal
+    u64 rem = 0;//rem is remainder, initialize to 0
+    u8 ss[BLOCKSIZE * 6 + 1] = {0}, *ssptr;//a template to initialize des
+    memset(ss, '0', BLOCKSIZE * 6);
+    ssptr = ss + BLOCKSIZE * 6 - 1;//point to the last '0' position, the lowest digit position
+    if(strlen(des) < 6 * BLOCKSIZE)
+        return -1;//des size too small
+    memcpy(des, ss, BLOCKSIZE * 6 + 1);//initialize des
+    memcpy(divided, src, BLOCKSIZE * 2);//initialize diveded number
+    do
+    {
+        while(0 == *dptr){//skip leading zeros
+            dptr++;
+            qptr++;
+            if(dptr - (u32*)divided == BLOCKSIZE * 2 / 4)//divided number equals 0
+                break;
+            continue;
+        }
+        if(dptr - (u32*)divided == BLOCKSIZE * 2 / 4)//outer loop break condition is divided number equals 0
+            break;
+        do
+        {
+            *qptr++ = (rem + *dptr) / 10;//fill quo arrary
+            rem = (rem + *dptr++) % 10;
+            if(dptr - (u32*)divided == BLOCKSIZE * 2 / 4)//inner loop break condition is divided arrary traversal finished
+                break;
+            rem <<= 32;
+        } while (1);
+        *ssptr-- = rem + 0x30;//get a digit from 0 to 9
+        rem = 0;//reset rem
+        if(ssptr == ss)
+            return -1;//out of band
+        memcpy(divided, quo, BLOCKSIZE * 2);//copy quo arrary to dividec arrary
+        memset(quo, 0, BLOCKSIZE * 2);//empty quo arrary
+        dptr = (u32*)divided;//reset dptr
+        qptr = (u32*)quo;//reset qptr
+    } while (1);
+    memcpy(des, ss, BLOCKSIZE * 6 + 1);
+    return ssptr - ss + 1;//number of leading zeros
 }
