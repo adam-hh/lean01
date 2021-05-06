@@ -506,15 +506,15 @@ digits string to number
 int StringToNumber(u8 *src, u8 *des)
 {
     u32 slen = strlen(src);
-    if(slen > BLOCKSIZE * 2)//conservative estimate
-        return -1;
-    u32 rem = 0, rem2 = 0, *dptr;
-    u8 sar[slen], *sptr;
-    sptr = sar + slen -1;
+    //if(slen > BLOCKSIZE * 2)//conservative estimate
+        //return -1;
+    u32 rem = 0, rem2 = 0, *dptr;//rem and rem2 to store remainder value, dptr is a write pointer of des
+    u8 sar[slen], *sptr;//sar to store digit exchanged from char of ascii code
+    sptr = sar;
     memcpy(sar, src, slen);
-    while(sptr != sar - 1){
+    while(sptr != sar + slen){
         if(isdigit(*sptr))
-            *sptr-- -= 0x30;
+            *sptr++ -= 0x30;//exchange char of ascii code to digit
         else
             return -1;//illegal src string contains non digit symbol
     }
@@ -534,11 +534,11 @@ int StringToNumber(u8 *src, u8 *des)
         {
             rem2 = (rem + *sptr) & 0x01;//divide 2 remainder
             *sptr = (rem + *sptr) >> 1;//divide 2 quotient
-            rem = rem2;
+            rem = rem2;//update rem value for the next loop
             if((++sptr) - sar == slen)
                 break;//inner loop break condition is sar traversal finished
             if(rem)
-                rem = 10;//wierd
+                rem = 10;//carrier value
         } while (1);
         if(rem)
             *dptr += (rem << cnt);//get one bit store to des

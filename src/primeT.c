@@ -8,7 +8,7 @@ prime number decomposition, x is the number to be decomposite, *p is the arrary 
 int primeFact(u_int64_t x, u_int64_t **p)
 {
     u_int64_t i,j;//counters
-    u_int64_t tmp[PFACTLISTSIZE] = {0};//store facts to a temp arrary in stack
+    u_int64_t tmp[PFACTLISTSIZE] = {0};//store facts to a temp arrary
     for(i = (j = 0); pTable[i] <= sqrt(x); i++)
     {
         if(0 == (x % pTable[i]))
@@ -26,8 +26,10 @@ int primeFact(u_int64_t x, u_int64_t **p)
         return -1;//unknow error
     }
     memset(*p, 0, (j + 2) * sizeof(u_int64_t));//arrary size set to "j+1" to leave a zero at the end of arrary to identify the end
+    if(j > PFACTLISTSIZE - 2)
+        return -1;//outof band
     do{
-        *(*p + j) = tmp[j];//store facts to a arrary not in stack
+        *(*p + j) = tmp[j];//
     }while(j-- != 0);
     return 1;
 }
@@ -44,7 +46,7 @@ void createpTable()
     for(i = 5; i <= PRIMEUPL; i++)//i is a number to be test
     {
         if(!(i & 0x01))
-            continue;
+            continue;//skip even number
         tag = 0;
         for(j = 1; (pTable[j] != 0) && (pTable[j] <= sqrt(i)); j++)
         {
