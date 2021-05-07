@@ -599,3 +599,124 @@ int NumberToString(u8 *src, u8 *des)
     memcpy(des, ss, BLOCKSIZE * 6 + 1);
     return ssptr - ss + 1;//number of leading zeros
 }
+int sllBigNum(u8 *a, u32 k)//logical shift left operation
+{
+    if(k >= BLOCKSIZE * 8)
+        return -1;
+    u32 q = k / 32, r = k % 32, *aptr =  (u32*)a + BLOCKSIZE / 4 + 1;
+    u64 tmp = 0;
+    union
+    {
+        u64 t;
+        struct
+        {
+            u32 x1;
+            u32 x2;
+        }x;
+    }slr = {0};
+    while(q--){
+        while(aptr != (u32*)a + BLOCKSIZE * 2 / 4){
+            *(aptr - 1) = *aptr;
+            aptr++;
+        }
+        *(aptr - 1) = *aptr;
+        *aptr = 0;
+        aptr = (u32*)a + BLOCKSIZE / 4 + 1;
+    }
+    aptr = (u32*)a + BLOCKSIZE * 2 / 4 - k / 32;
+    while(aptr != (u32*)a + BLOCKSIZE * 2 / 4){
+        slr.x.x1 = *aptr;
+        slr.t <<= r;
+        *aptr = slr.x.x1 + tmp;
+        tmp = slr.x.x2;
+        slr.t = 0;
+    }
+}
+int slrBigNum(u8 *a, u32 k)//logical shift right operation
+{
+    if(k >= BLOCKSIZE * 8)
+        return -1;
+    u32 q = k / 32, r = k % 32, *aptr =  (u32*)a + BLOCKSIZE * 2 / 4 - 2;
+    u64 tmp = 0;
+    union//little edian problly work
+    {
+        u64 t;
+        struct
+        {
+            u32 x1;
+            u32 x2;
+        }x;
+    }slr = {0};
+    while(q--){
+        while(aptr != (u32*)a + BLOCKSIZE / 4){
+            *(aptr + 1) = *aptr;
+            aptr--;
+        }
+        *(aptr + 1) = *aptr;
+        *aptr = 0;
+        aptr = (u32*)a + BLOCKSIZE * 2 / 4 - 2;
+    }
+    aptr = (u32*)a + BLOCKSIZE / 4 + k / 32;
+    while(aptr != (u32*)a + BLOCKSIZE * 2 / 4){
+        slr.x.x2 = *aptr;
+        slr.t >>= r;
+        *aptr++ = slr.x.x2 + tmp;
+        tmp = slr.x.x1;
+        slr.t = 0;
+    }
+}
+int equalBigNum(u8 *a, u8 *b)
+{
+    u32 *aptr = (u32*)a, *bptr = (u32*)b;
+    while(aptr != (u32*)a + BLOCKSIZE * 2 / 4)
+    {
+        if(*aptr++ == *bptr++)
+            continue;
+        else
+            return 0;
+    }
+    if(*aptr == *bptr)
+        return 1;
+    else
+        return 0;
+}
+/*
+rabin-miller
+*/
+int rabinMiller(u8 *x, u8 *a)
+{
+    u8 q[BLOCKSIZE * 2] = {0}, xSubOne[BLOCKSIZE * 2] = {0}, one[BLOCKSIZE * 2] = {0}, nagativeOne[BLOCKSIZE * 2] = {0};
+    u8 rem[BLOCKSIZE * 2] = {0};
+    u32 *xptr = (u32*)xSubOne + (BLOCKSIZE * 2 / 4) -1, k = 0;
+    memcpy(xSubOne, x, BLOCKSIZE * 2);
+    *((u32*)one + BLOCKSIZE * 2 / 4 - 1) = 1;
+    subBigNum(xSubOne, one);
+    *(xptr + BLOCKSIZE / 4 - 1) = 0;//erase overflow if exist
+    memcpy(nagativeOne, xSubOne, BLOCKSIZE * 2);//-1 = x-1 % x
+    while(!(*xptr & 0x01)){
+        if(!(*xptr)){
+            k += 32;
+            xptr--;
+        }
+        else
+        {
+            k++;
+            *xptr >>= 1;//xSubOne is overriding here
+        }
+        if(xptr - (u32*)xSubOne == BLOCKSIZE / 4 - 1)
+            return -1;//x is an illegal number
+    }
+    memcpy(q, nagativeOne, BLOCKSIZE * 2);
+    slrBigNum(q, k);
+    powerModeBigNum(a, x, q, rem);
+    if(equalBigNum(rem, one))
+        return 0;
+    for(u32 i = 0; i < k; i++)
+    {
+        sllBigNum(q, i);
+        powerModeBigNum(a, x, q, rem);
+        if(equalBigNum(rem, nagativeOne))
+            return 0;
+    }
+    return 1;
+}
