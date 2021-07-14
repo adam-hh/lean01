@@ -5,7 +5,7 @@
  * GCD func
  * input: a, b
  * output: g
- * return: a for success, -1 for fail
+ * return: 1 for success, -1 for fail
  */
 int gcdw(const N128 *a, const N128 *b, N128 *g)
 {
@@ -18,7 +18,7 @@ int gcdw(const N128 *a, const N128 *b, N128 *g)
     copyw(&aval, a);                                            /*init vars*/
     copyw(&bval, b);
 
-    while(skiplzw(&bval, NULL) != (sizeof(bval.val) / 4)) {     /*loop condition: bval not equals 0*/
+    while(skiplzw(&bval, NULL) != (sizeof(bval.val) >> 2)) {     /*loop condition: bval not equals 0*/
         modew(&aval, &bval, &rem, NULL, NULL);                        /*aval mod bval -> rem*/
         copyw(&aval, &bval);                                    /*bval -> aval*/
         copyw(&bval, &rem);                                     /*rem -> bval*/
@@ -42,7 +42,7 @@ int gcdd(const N256 *a, const N256 *b, N256 *g)
     copyd(&aval, a);
     copyd(&bval, b);
 
-    while(skiplzd(&bval, NULL) != (sizeof(bval.val) / 4)) {
+    while(skiplzd(&bval, NULL) != (sizeof(bval.val) >> 2)) {
         moded(&aval, &bval, &rem, NULL, NULL);
         copyd(&aval, &bval);
         copyd(&bval, &rem);
@@ -66,7 +66,7 @@ int gcdq(const N512 *a, const N512 *b, N512 *g)
     copyq(&aval, a);
     copyq(&bval, b);
 
-    while(skiplzq(&bval, NULL) != (sizeof(bval.val) / 4)) {
+    while(skiplzq(&bval, NULL) != (sizeof(bval.val) >> 2)) {
         modeq(&aval, &bval, &rem, NULL, NULL);
         copyq(&aval, &bval);
         copyq(&bval, &rem);
@@ -102,7 +102,7 @@ int linearEquitionw(const N128 *restrict a, const N128 *restrict b, N128 *restri
     a256 = castwtd(a);
     b256 = castwtd(b);
 
-    while(skiplzd(&b256, NULL) != (sizeof(b256.val) / 4)) {         /*loop condition: b not equals 0*/
+    while(skiplzd(&b256, NULL) != (sizeof(b256.val) >> 2)) {         /*loop condition: b not equals 0*/
         moded(&a256, &b256, &r256, &q256, NULL);                    /*a mod b, remainder to rem, quotient to quo*/
 
         invd(&v, &inv);                                             /*v = -v*/
@@ -161,7 +161,7 @@ int linearEquitiond(const N256 *restrict a, const N256 *restrict b, N256 *restri
     a512 = castdtq(a);
     b512 = castdtq(b);
 
-    while(skiplzq(&b512, NULL) != (sizeof(b512.val) / 4)) {         /*loop condition: b not equals 0*/
+    while(skiplzq(&b512, NULL) != (sizeof(b512.val) >> 2)) {         /*loop condition: b not equals 0*/
         modeq(&a512, &b512, &r512, &q512, NULL);                          /*a mod b, remainder to rem, quotient to quo*/
 
         invq(&v, &inv);                                             /*v = -v*/
