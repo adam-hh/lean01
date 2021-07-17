@@ -1,8 +1,64 @@
-.DS_Store
-*.o
-*.out
 primetable
 logger
 .vscode/*.json
 libs/*
-Helps
+Helps/*
+Helps/gcc.txt
+
+##### Generic patterns
+# Auto generated assembly language source files
+*.s
+!/crypto/*/asm/*.s
+/crypto/arm*.S
+/crypto/*/*.S
+*.asm
+!/crypto/*/asm/*.asm
+
+# Object files
+*.o
+*.obj
+
+# editor artefacts
+*.swp
+.#*
+\#*#
+*~
+
+# All kinds of libraries and executables
+*.a
+*.so
+*.so.*
+*.dylib
+*.dylib.*
+*.dll
+*.dll.*
+*.exe
+*.pyc
+*.exp
+*.lib
+*.pdb
+*.tds
+*.ilk
+*.def
+*.rc
+*.res
+*.out
+
+# Misc generated stuff
+Makefile.save
+/crypto/**/lib
+/engines/**/lib
+/ssl/**/lib
+*.bak
+cscope.*
+*.d
+*.d.tmp
+pod2htmd.tmp
+MAKE0[0-9][0-9][0-9].@@@
+
+# Windows manifest files
+*.manifest
+doc-nits
+
+# Apple tmp
+*.DS_Store

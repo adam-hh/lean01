@@ -317,21 +317,27 @@ static int B64EncodeFile(B64Encoder *enc, const char *filein, const char *fileou
   }
   if (fstat(fdin, &sta) == -1) {
     fprintf(stderr, "stat %s error: %s\n", filein, strerror(errno));
+    close(fdin);
     return b64BadParam;
   }
   if (!S_ISREG(sta.st_mode)) {
     fprintf(stderr, "%s is not a regular file.\n", filein);
+    close(fdin);
     return b64BadParam;
   }
   if ((fileSize = sta.st_size) > MAXFILESIZE) {
     fprintf(stderr, "%s too big.\n", filein);
+    close(fdin);
     return b64BadParam;
   }
 
-  if ((fbuffer = (uint8_t *)malloc(fileSize)) == NULL)
+  if ((fbuffer = (uint8_t *)malloc(fileSize)) == NULL) {
+    close(fdin);
     return b64MemAllocError;
+  }
   if (read(fdin, fbuffer, fileSize) != fileSize) {
     fprintf(stderr, "read %s error: %s\n", filein, strerror(errno));
+    close(fdin);
     return b64BadParam;
   }
 
@@ -341,6 +347,7 @@ static int B64EncodeFile(B64Encoder *enc, const char *filein, const char *fileou
         fprintf(stderr, "open %s error: %s\n", fileout, strerror(errno));
         free(fbuffer);
         B64EncReset(enc);
+        close(fdin);
         return b64BadParam;
       }
 
@@ -348,17 +355,22 @@ static int B64EncodeFile(B64Encoder *enc, const char *filein, const char *fileou
         fprintf(stderr, "write %s error: %s\n", fileout, strerror(errno));
         free(fbuffer);
         B64EncReset(enc);
+        close(fdin);
+        close(fdout);
         return b64BadParam;
       }
+      close(fdout);
     }
   } else {
     fprintf(stderr, "%s encode failed: %s\n", filein, rlt == b64MemAllocError ? "b64MemAllocError" : "b64NullPointer");
     free(fbuffer);
     B64EncReset(enc);
+    close(fdin);
     return b64BadParam;
   }
 
   free(fbuffer);
+  close(fdin);
   return b64Success;
 }
 
@@ -388,21 +400,27 @@ static int B64DecodeFile(B64Decoder *dec, const char *filein, const char *fileou
   }
   if (fstat(fdin, &sta) == -1) {
     fprintf(stderr, "stat %s error: %s\n", filein, strerror(errno));
+    close(fdin);
     return b64BadParam;
   }
   if (!S_ISREG(sta.st_mode)) {
     fprintf(stderr, "%s is not a regular file.\n", filein);
+    close(fdin);
     return b64BadParam;
   }
   if ((fileSize = sta.st_size) > (MAXFILESIZE << 1)) {
     fprintf(stderr, "%s too big.\n", filein);
+    close(fdin);
     return b64BadParam;
   }
 
-  if ((b64enc.arry = (char *)malloc(fileSize)) == NULL)
+  if ((b64enc.arry = (char *)malloc(fileSize)) == NULL) {
+    close(fdin);
     return b64MemAllocError;
+  }
   if (read(fdin, b64enc.arry, fileSize) != fileSize) {
     fprintf(stderr, "read %s error: %s\n", filein, strerror(errno));
+    close(fdin);
     return b64BadParam;
   }
   b64enc.len = fileSize;
@@ -413,6 +431,7 @@ static int B64DecodeFile(B64Decoder *dec, const char *filein, const char *fileou
         fprintf(stderr, "open %s error: %s\n", fileout, strerror(errno));
         B64EncReset(&b64enc);
         B64DecReset(dec);
+        close(fdin);
         return b64BadParam;
       }
 
@@ -420,16 +439,21 @@ static int B64DecodeFile(B64Decoder *dec, const char *filein, const char *fileou
         fprintf(stderr, "write %s error: %s\n", fileout, strerror(errno));
         B64EncReset(&b64enc);
         B64DecReset(dec);
+        close(fdin);
+        close(fdout);
         return b64BadParam;
       }
+      close(fdout);
     }
   } else {
     fprintf(stderr, "%s docode failed: %s\n", filein, rlt == b64MemAllocError ? "b64MemAllocError" : "b64BadParam");
     B64EncReset(&b64enc);
     B64DecReset(dec);
+    close(fdin);
     return b64BadParam;
   }
 
   B64EncReset(&b64enc);
+  close(fdin);
   return b64Success;
 }

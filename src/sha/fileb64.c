@@ -12,7 +12,7 @@ int main(int argc, char *argv[])
 	int     opt;
 
   opterr = 0;
-  optin = optout = NULL;
+  optc = optin = optout = NULL;
   while ((opt = getopt(argc, argv, "c:i:o::")) != -1) {
     switch(opt) {
     case 'c' :
