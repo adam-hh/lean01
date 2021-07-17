@@ -121,54 +121,29 @@ int SHA1Reset(SHA1Context *context)
 int SHA1Input(SHA1Context *context,
     const uint8_t *message_array, unsigned length)
 {
-  unsigned curIdx;
+  unsigned padLen;
   if (!context) return shaNull;
   if (!length) return shaSuccess;
   if (!message_array) return shaNull;
   if (context->Computed) return context->Corrupted = shaStateError;
   if (context->Corrupted) return context->Corrupted;
   
-  curIdx = context->Message_Block_Index;
-  if ((length + curIdx >= SHA1_Message_Block_Size) &&
-      (SHA1AddLength(context, (SHA1_Message_Block_Size - curIdx) << 3) == shaSuccess)) {
-    memcpy(context->Message_Block + curIdx, message_array, SHA1_Message_Block_Size - curIdx);
-    message_array += SHA1_Message_Block_Size - curIdx;
-    SHA1ProcessMessageBlock(context);
-    length -= (SHA1_Message_Block_Size - curIdx);
-  } else if (SHA1AddLength(context, length << 3) == shaSuccess) {
-    memcpy(context->Message_Block + curIdx, message_array, length);
-    context->Message_Block_Index += length;
-    goto end;
-  } else {
-    goto end;
-  }
   while (length) {
-    if ((length >= SHA1_Message_Block_Size) &&
-        (SHA1AddLength(context, SHA1_Message_Block_Size << 3) == shaSuccess)) {
-      memcpy(context->Message_Block, message_array, SHA1_Message_Block_Size);
+    padLen = SHA1_Message_Block_Size - context->Message_Block_Index;
+    if ((length >= padLen) && (SHA1AddLength(context, padLen << 3) == shaSuccess)) {
+      memcpy(context->Message_Block + context->Message_Block_Index, message_array, padLen);
+      message_array += padLen;
+      length -= padLen;
       SHA1ProcessMessageBlock(context);
-      message_array += SHA1_Message_Block_Size;
-      length -= SHA1_Message_Block_Size;
     } else if (SHA1AddLength(context, length << 3) == shaSuccess) {
-      memcpy(context->Message_Block, message_array, length);
-      context->Message_Block_Index = length;
+      memcpy(context->Message_Block + context->Message_Block_Index, message_array, length);
+      context->Message_Block_Index += length;
       length = 0;
     } else {
       length = 0;
     }
-    /*
-    context->Message_Block[context->Message_Block_Index++] =
-      *message_array;
-
-    if ((SHA1AddLength(context, 8) == shaSuccess) &&
-      (context->Message_Block_Index == SHA1_Message_Block_Size))
-      SHA1ProcessMessageBlock(context);
-
-    message_array++;
-    */
   }
   
-  end:
   return context->Corrupted;
 }
 

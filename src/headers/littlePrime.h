@@ -1,6 +1,5 @@
 /**
- * Buildin integer type operations
- * Try not use any std libs
+ * Copyright (c) 2020-2021, Adam hh <adamhh.wk@gmail.com>
  */
 
 #ifndef LITTLEPRIME_H

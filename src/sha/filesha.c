@@ -13,6 +13,7 @@ int main(int argc, char *argv[])
 	int     opt, select, i;
 
 	opterr = 0;
+    opto = optf = NULL;
     while((opt = getopt(argc, argv, "o:f:")) != -1) {
         switch(opt) {
         case 'o' :

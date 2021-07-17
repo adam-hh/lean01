@@ -511,54 +511,29 @@ int SHA512Input(SHA512Context *context,
         const uint8_t *message_array,
         unsigned int length)
 {
-  unsigned curIdx;
+  unsigned padLen;
   if (!context) return shaNull;
   if (!length) return shaSuccess;
   if (!message_array) return shaNull;
   if (context->Computed) return context->Corrupted = shaStateError;
   if (context->Corrupted) return context->Corrupted;
 
-  curIdx = context->Message_Block_Index;
-  if ((length + curIdx >= SHA512_Message_Block_Size) &&
-      (SHA384_512AddLength(context, (SHA512_Message_Block_Size - curIdx) << 3) == shaSuccess)) {
-    memcpy(context->Message_Block + curIdx, message_array, SHA512_Message_Block_Size - curIdx);
-    message_array += SHA512_Message_Block_Size - curIdx;
-    SHA384_512ProcessMessageBlock(context);
-    length -= (SHA512_Message_Block_Size - curIdx);
-  } else if (SHA384_512AddLength(context, length << 3) == shaSuccess) {
-    memcpy(context->Message_Block + curIdx, message_array, length);
-    context->Message_Block_Index += length;
-    goto end;
-  } else {
-    goto end;
-  }
   while (length) {
-    if ((length >= SHA512_Message_Block_Size) &&
-        (SHA384_512AddLength(context, SHA512_Message_Block_Size << 3) == shaSuccess)) {
-      memcpy(context->Message_Block, message_array, SHA512_Message_Block_Size);
+    padLen = SHA512_Message_Block_Size - context->Message_Block_Index;
+    if ((length >= padLen) && (SHA384_512AddLength(context, padLen << 3) == shaSuccess)) {
+      memcpy(context->Message_Block + context->Message_Block_Index, message_array, padLen);
+      message_array += padLen;
+      length -= padLen;
       SHA384_512ProcessMessageBlock(context);
-      message_array += SHA512_Message_Block_Size;
-      length -= SHA512_Message_Block_Size;
     } else if (SHA384_512AddLength(context, length << 3) == shaSuccess) {
-      memcpy(context->Message_Block, message_array, length);
-      context->Message_Block_Index = length;
+      memcpy(context->Message_Block + context->Message_Block_Index, message_array, length);
+      context->Message_Block_Index += length;
       length = 0;
     } else {
       length = 0;
     }
-    /*
-    context->Message_Block[context->Message_Block_Index++] =
-            *message_array;
-
-    if ((SHA384_512AddLength(context, 8) == shaSuccess) &&
-      (context->Message_Block_Index == SHA512_Message_Block_Size))
-      SHA384_512ProcessMessageBlock(context);
-
-    message_array++;
-    */
   }
 
-  end:
   return context->Corrupted;
 }
 

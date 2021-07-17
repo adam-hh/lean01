@@ -1,5 +1,6 @@
 /**
- * ADAM H
+ * RSA algrithm personal implementation
+ * Copyright (c) 2020-2021, Adam hh <adamhh.wk@gmail.com>
  */
 
 #ifndef BIGNUMBER_H

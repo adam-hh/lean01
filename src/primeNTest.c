@@ -21,6 +21,14 @@ struct evidStackq {
     uint32_t rsp;
 };
 
+struct evidHashN128 {
+    int idx;
+    N128 *val;
+    struct evidHashN128 *next;
+};
+
+#define HASHN128(ptr128) (ptr128->val[0] & 0x7f)
+
 #define pushEvdw(sta, val) \
         sta->rsp++; \
         copyw(sta->stack + sta->rsp, val)
@@ -33,8 +41,8 @@ struct evidStackq {
         sta->rsp++; \
         copyq(sta->stack + sta->rsp, val)
 
-#define popEvd(sta) \
-        (sta->rsp--, sta->stack + sta->rsp + 1)
+#define popEvd(sta, val) \
+        (val = (sta->rsp--, sta->stack + sta->rsp + 1))
 
 //static N64 one64 = {{1}};
 static N128 one128 = {{1}};
@@ -58,6 +66,7 @@ static int MRtesthw(const N64 *n, int t, int fdUrandom)
     int cmp;                                                /*comparation result*/
     uint32_t wk, *pwk;                                      /*used to do binary expansion of n-1*/
     size_t lenOfn;                                          /*len of n*/
+    N128 *val;
 
     nval = casthwtw(n);                                     /*init vars*/
     nsub1 = casthwtw(n);
@@ -109,16 +118,16 @@ static int MRtesthw(const N64 *n, int t, int fdUrandom)
             if (cmp > 0) {
                 pushEvdw(candidate, &evidence);
                 while(exchange->rsp) {
-                    pushEvdw(candidate, popEvd(exchange));
+                    pushEvdw(candidate, popEvd(exchange, val));
                 }
                 break;
             } else if (cmp < 0) {
-                pushEvdw(exchange, popEvd(candidate));
+                pushEvdw(exchange, popEvd(candidate, val));
                 continue;
             } else {
                 i--;
                 while(exchange->rsp) {
-                    pushEvdw(candidate, popEvd(exchange));
+                    pushEvdw(candidate, popEvd(exchange, val));
                 }
                 goto cont;
             }
@@ -153,10 +162,8 @@ static int MRtestw(const N128 *n, int t, int fdUrandom)
     N128 nval, qval, rem, nsub1;                            /*n, q, remainder, n-1*/
     N256 n256, rem256, nsub1256, n256mask;                  /*double width edition*/
     N128 evidence;                                          /*RM evidence, which value between 1 and n-1*/
-    struct evidStackw *candidate, *exchange;                /*Evidence stacks for sorting order*/
     size_t k;                                               /*k*/
     int i, j;                                               /*loop counters*/
-    int cmp;                                                /*comparation result*/
     uint32_t wk, *pwk;                                      /*used to do binary expansion of n-1*/
     size_t lenOfn;                                          /*len of n*/
 
@@ -164,93 +171,59 @@ static int MRtestw(const N128 *n, int t, int fdUrandom)
     copyw(&nsub1, n);
     decw(&nsub1);
     copyw(&qval, &nsub1);
-    n256 = castwtd(n);
-    nsub1256 = castwtd(&nsub1);
 
-    pwk = (uint32_t *)(nsub1.val);
     lenOfn = sizeof(nval.val) - cntlzw(&nval);
-    if((nval.val[0] & 0x01) == 0)                           /*n is even*/
+    if ((nval.val[0] & 0x01) == 0)                          /*n is even*/
         return -1;
-    if(lenOfn <= 8) {                                       /*little number*/
+    if (lenOfn <= 8) {                                      /*little number*/
         /*fact it directly*/
         write(STDOUT_FILENO, "small n", 7);
         return -1;
     }
 
-    for(k = 0; k < (lenOfn << 3);) {                        /*binary expand n-1*/
+    pwk = (uint32_t *)(nsub1.val);
+    for (k = 0; k < (lenOfn << 3);) {                       /*binary expand n-1*/
         wk = *pwk++;
-        for(i = 0; i < 32; i++) {
-            if((wk & 0x01) == 0)
+        for (i = 0; i < 32; i++) {
+            if ((wk & 0x01) == 0)
                 k++;
             else
                 goto kpoint;                                /*binary expansion finished, break loop*/
             wk >>= 1;
         }
     }
-
     kpoint:
     sarw(&qval, k);                                         /*got k and q*/
-    if (k > 1)
-        dToMask(&n256, &n256mask);
-    
-    if((t == 0) || (t > MAXEVNUM))                          /*check value of t, then reset it*/
+
+    if ((t == 0) || (t > MAXEVNUM))                         /*check value of t, then reset it*/
         t = MAXEVNUM;
-
-    candidate = (struct evidStackw *)malloc(sizeof(struct evidStackw));
-    exchange = (struct evidStackw *)malloc(sizeof(struct evidStackw));
-    if((candidate == NULL) || (exchange == NULL))
-        return -1;
-    memset(candidate, 0, sizeof(struct evidStackw));
-    memset(exchange, 0, sizeof(struct evidStackw));
-
-    for(i = 0; i < t; i++) {
-        cont:
+    if (k > 1) {
+        n256 = castwtd(&nval);
+        nsub1256 = castwtd(&nsub1);
+        dToMask(&n256, &n256mask);
+    }
+    wzero(&evidence);
+    for (i = 0; i < t; i++) {
         read(fdUrandom, evidence.val, lenOfn - 1);          /*make sure evidence < n*/
-        evidence.val[0] |= 0x02;                            /*make sure evidence > 1*/
-
-        /*sorting order of evidences to avoid duplicating*/
-        while(1) {
-            cmp = cmpw(&evidence, &(candidate->stack[candidate->rsp]));
-            if (cmp > 0) {
-                pushEvdw(candidate, &evidence);
-                while(exchange->rsp) {
-                    pushEvdw(candidate, popEvd(exchange));
-                }
-                break;
-            } else if (cmp < 0) {
-                pushEvdw(exchange, popEvd(candidate));
-                continue;
-            } else {
-                while(exchange->rsp) {
-                    pushEvdw(candidate, popEvd(exchange));
-                }
-                goto cont;
-            }
-        }
+        evidence.val[0] = i + 2;                            /* make a unique serials number of evidence */
 
         powerModew(&evidence, &nval, &qval, &rem);          /*a^q mod n remaind rem*/
-        if(cmpw(&rem, &one128) == 0)                        /*a^q mod n remaind 1*/
+        if (cmpw(&rem, &one128) == 0)                       /*a^q mod n remaind 1*/
             continue;
-        if(cmpw(&rem, &nsub1) == 0)                         /*a^q mod n remaind -1*/
+        if (cmpw(&rem, &nsub1) == 0)                        /*a^q mod n remaind -1*/
             continue;
-
         rem256 = castwtd(&rem);
-        for(j = 1; j < k; j++) {                            /*loop count k-1*/
+        for (j = 1; j < k; j++) {                           /*loop count k-1*/
             vmultd(&rem256, &rem256);                       /*(a^q)^2*/
             modd(&rem256, &n256, &n256mask);                /*(a^q)^2 mod n*/
-            if(cmpd(&rem256, &nsub1256) == 0)               /*compare (a^q)^2 mod n remaind and -1*/
-                goto ppoint;
+            if (cmpd(&rem256, &nsub1256) == 0)              /*compare (a^q)^2 mod n remaind and -1*/
+                break;
         }
-        ppoint:
         if (j == k) {
-            free(candidate);
-            free(exchange);
             return -1;                                      /*passed one evidence's power mode calculation*/
         }
     }
 
-    free(candidate);
-    free(exchange);
     return 1;                                               /*failed all the power mode calculation*/
 }
 static int MRtestd(const N256 *n, int t, int fdUrandom)
@@ -258,10 +231,8 @@ static int MRtestd(const N256 *n, int t, int fdUrandom)
     N256 nval, qval, rem, nsub1;                            /*n, q, remainder, n-1*/
     N512 n512, rem512, nsub1512, n512mask;                  /*double width edition*/
     N256 evidence;                                          /*RM evidence, which value between 1 and n-1*/
-    struct evidStackd *candidate, *exchange;                /*Evidence stacks for sorting order*/
     size_t k;                                               /*k*/
     int i, j;                                               /*loop counters*/
-    int cmp;                                                /*comparation result*/
     uint32_t wk, *pwk;                                      /*used to do binary expansion of n-1*/
     size_t lenOfn;                                          /*len of n*/
 
@@ -269,95 +240,59 @@ static int MRtestd(const N256 *n, int t, int fdUrandom)
     copyd(&nsub1, n);
     decd(&nsub1);
     copyd(&qval, &nsub1);
-    n512 = castdtq(&nval);
-    nsub1512 = castdtq(&nsub1);
 
-    pwk = (uint32_t *)(nsub1.val);
     lenOfn = sizeof(nval.val) - cntlzd(&nval);
-    if((nval.val[0] & 0x01) == 0)                           /*n is even*/
+    if ((nval.val[0] & 0x01) == 0)                          /*n is even*/
         return -1;
-    if(lenOfn <= 8) {                                       /*little number*/
+    if (lenOfn <= 8) {                                      /*little number*/
         /*fact it directly*/
         write(STDOUT_FILENO, "small n", 7);
         return -1;
     }
 
-    for(k = 0; k < (lenOfn << 3);) {                        /*binary expand n-1*/
+    pwk = (uint32_t *)(nsub1.val);
+    for (k = 0; k < (lenOfn << 3);) {                       /*binary expand n-1*/
         wk = *pwk++;
-        for(i = 0; i < 32; i++) {
-            if((wk & 0x01) == 0)
+        for (i = 0; i < 32; i++) {
+            if ((wk & 0x01) == 0)
                 k++;
             else
                 goto kpoint;                                /*binary expansion finished, break loop*/
             wk >>= 1;
         }
     }
-
     kpoint:
     sard(&qval, k);                                         /*got k and q*/
-    if (k > 1)
-        qToMask(&n512, &n512mask);
     
-    if((t == 0) || (t > MAXEVNUM))                          /*check value of t, then reset it*/
+    if ((t == 0) || (t > MAXEVNUM))                         /*check value of t, then reset it*/
         t = MAXEVNUM;
-
-    candidate = (struct evidStackd *)malloc(sizeof(struct evidStackd));
-    exchange = (struct evidStackd *)malloc(sizeof(struct evidStackd));
-    if((candidate == NULL) || (exchange == NULL)) {
-        //write(STDOUT_FILENO, "malloc fail", strlen("malloc fail"));
-        return -1;
+    if (k > 1) {
+        n512 = castdtq(&nval);
+        nsub1512 = castdtq(&nsub1);
+        qToMask(&n512, &n512mask);
     }
-    memset(candidate, 0, sizeof(struct evidStackd));
-    memset(exchange, 0, sizeof(struct evidStackd));
-
-    for(i = 0; i < t; i++) {
-        cont:
+    dzero(&evidence);
+    for (i = 0; i < t; i++) {
         read(fdUrandom, evidence.val, lenOfn - 1);          /*make sure evidence < n*/
-        evidence.val[0] |= 0x02;                            /*make sure evidence > 1*/
+        evidence.val[0] = i + 2;                            /*make sure evidence > 1*/
 
-        /*sorting order of evidences to avoid duplicating*/
-        while(1) {
-            cmp = cmpd(&evidence, &(candidate->stack[candidate->rsp]));
-            if (cmp > 0) {
-                pushEvdd(candidate, &evidence);
-                while(exchange->rsp) {
-                    pushEvdd(candidate, popEvd(exchange));
-                }
-                break;
-            } else if (cmp < 0) {
-                pushEvdd(exchange, popEvd(candidate));
-                continue;
-            } else {
-                while(exchange->rsp) {
-                    pushEvdd(candidate, popEvd(exchange));
-                }
-                goto cont;
-            }
-        }
-        //printf("evidence %d k %lu\n", i, k);
         powerModed(&evidence, &nval, &qval, &rem);          /*a^q mod n remaind rem*/
-        if(cmpd(&rem, &one256) == 0)                        /*a^q mod n remaind 1*/
+        if (cmpd(&rem, &one256) == 0)                       /*a^q mod n remaind 1*/
             continue;
-        if(cmpd(&rem, &nsub1) == 0)                         /*a^q mod n remaind -1*/
+        if (cmpd(&rem, &nsub1) == 0)                        /*a^q mod n remaind -1*/
             continue;
-
         rem512 = castdtq(&rem);
-        for(j = 1; j < k; j++) {                            /*loop count k-1*/
-            vmultq(&rem512, &rem512);                       /*(a^q)^2*/
-            modq(&rem512, &n512, &n512mask);                /*(a^q)^2 mod n*/
-            if(cmpq(&rem512, &nsub1512) == 0)               /*compare (a^q)^2 mod n remaind and -1*/
+        for (j = 1; j < k; j++) {
+            vmultq(&rem512, &rem512);
+            modq(&rem512, &n512, &n512mask);
+            if (cmpq(&rem512, &nsub1512) == 0)
                 goto ppoint;
         }
         ppoint:
-        if (j == k) {
-            free(candidate);
-            free(exchange);
-            return -1;                                      /*passed one evidence's power mode calculation*/
-        }
+        if (j == k)
+            return -1;
     }
 
-    free(candidate);
-    free(exchange);
     return 1;                                               /*failed all the power mode calculation*/
 }
 
