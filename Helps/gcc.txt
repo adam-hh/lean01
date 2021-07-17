@@ -1,2 +1,0 @@
-查gcc的配置
-echo | gcc -v -x c -E -
