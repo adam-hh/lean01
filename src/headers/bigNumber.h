@@ -9,6 +9,8 @@
 #include <sys/types.h>                                      /*canonical int types, e.g uint32_t, uint64_t, etc*/
 #include <stdint.h>                                         /*incase sys/types.h is not enough*/
 #include <signal.h>                                         /*SIGFPE for arithmetic exception*/
+#include <string.h>
+#include "bitArray.h"
 
 #ifdef __cpluscplus
 extern "C" {
@@ -56,19 +58,17 @@ typedef struct {
 static inline void addw(N128 *a, const N128 *b)
 {
     uint32_t *pa, *pb;
-    uint64_t sum, of;
+    uint64_t sum;
 
     pa = (uint32_t *)(a->val);
     pb = (uint32_t *)(b->val);
-    of = 0;
+    sum = 0;
 
     for(int i = 0; i < (sizeof(a->val) >> 2); i++) {
-        sum = *pa;
+        sum += *pa;
         sum += *pb;
-        sum += of;
-        of = (sum >> 32);
         *pa = sum;
-
+        sum >>= 32;
         pa++;
         pb++;
     }
@@ -76,19 +76,17 @@ static inline void addw(N128 *a, const N128 *b)
 static inline void addd(N256 *a, const N256 *b)
 {
     uint32_t *pa, *pb;
-    uint64_t sum, of;
+    uint64_t sum;
 
     pa = (uint32_t *)(a->val);
     pb = (uint32_t *)(b->val);
-    of = 0;
+    sum = 0;
 
     for(int i = 0; i < (sizeof(a->val) >> 2); i++) {
-        sum = *pa;
+        sum += *pa;
         sum += *pb;
-        sum += of;
-        of = (sum >> 32);
         *pa = sum;
-
+        sum >>= 32;
         pa++;
         pb++;
     }
@@ -96,19 +94,17 @@ static inline void addd(N256 *a, const N256 *b)
 static inline void addq(N512 *a, const N512 *b)
 {
     uint32_t *pa, *pb;
-    uint64_t sum, of;
+    uint64_t sum;
 
     pa = (uint32_t *)(a->val);
     pb = (uint32_t *)(b->val);
-    of = 0;
+    sum = 0;
 
     for(int i = 0; i < (sizeof(a->val) >> 2); i++) {
-        sum = *pa;
+        sum += *pa;
         sum += *pb;
-        sum += of;
-        of = (sum >> 32);
         *pa = sum;
-
+        sum >>= 32;
         pa++;
         pb++;
     }
@@ -226,54 +222,48 @@ static inline void incq(N512 *a)
 static inline void decw(N128 *a)
 {
     uint32_t *pa;
-    uint64_t sum, of;
+    uint64_t sum;
 
     pa = (uint32_t *)(a->val);
-    of = 0;
+    sum = 0;
 
     for(int i = 0; i < (sizeof(a->val) >> 2); i++) {
-        sum = *pa;
+        sum += *pa;
         sum += 0xffffffff;
-        sum += of;
-        of = (sum >> 32);
         *pa = sum;
-
+        sum >>= 32;
         pa++;
     }
 }
 static inline void decd(N256 *a)
 {
     uint32_t *pa;
-    uint64_t sum, of;
+    uint64_t sum;
 
     pa = (uint32_t *)(a->val);
-    of = 0;
+    sum = 0;
 
     for(int i = 0; i < (sizeof(a->val) >> 2); i++) {
-        sum = *pa;
+        sum += *pa;
         sum += 0xffffffff;
-        sum += of;
-        of = (sum >> 32);
         *pa = sum;
-
+        sum >>= 32;
         pa++;
     }
 }
 static inline void decq(N512 *a)
 {
     uint32_t *pa;
-    uint64_t sum, of;
+    uint64_t sum;
 
     pa = (uint32_t *)(a->val);
-    of = 0;
+    sum = 0;
 
     for(int i = 0; i < (sizeof(a->val) >> 2); i++) {
-        sum = *pa;
+        sum += *pa;
         sum += 0xffffffff;
-        sum += of;
-        of = (sum >> 32);
         *pa = sum;
-
+        sum >>= 32;
         pa++;
     }
 }
@@ -563,6 +553,13 @@ static inline size_t cntlzq(const N512 *a)
     return n;
 }
 
+/* bit length of a uint32_t obj */
+#define dwbLen(a)       \
+        (a >> 24) ? 24 + octedBitWidth[a >> 24] : \
+        (a >> 16) ? 16 + octedBitWidth[a >> 16] : \
+        (a >> 8)  ?  8 + octedBitWidth[a >> 8 ] : \
+        (a)       ?      octedBitWidth[a]       : 0
+
 /**
  * bit length
  * input: a
@@ -571,61 +568,34 @@ static inline size_t cntlzq(const N512 *a)
  */
 static inline size_t bitLenw(const N128 *a)
 {
-    uint32_t *pa, val;
+    uint32_t *pa;
     size_t len;
 
     len = (sizeof(a->val) >> 2) -skiplzw(a, &pa);
-    if (len) {
-        len--;
-        len <<= 5;     
-    } else {
-        return 0;
-    }
-    val = *pa;
-    while(val) {
-        val >>= 1;
-        len++;
-    }
+    len <<= 5;
+    len -= (32 - (dwbLen(*pa)));
 
     return len;
 }
 static inline size_t bitLend(const N256 *a)
 {
-    uint32_t *pa, val;
+    uint32_t *pa;
     size_t len;
 
     len = (sizeof(a->val) >> 2) -skiplzd(a, &pa);
-    if (len) {
-        len--;
-        len <<= 5;     
-    } else {
-        return 0;
-    }
-    val = *pa;
-    while(val) {
-        val >>= 1;
-        len++;
-    }
+    len <<= 5;
+    len -= (32 - (dwbLen(*pa)));
 
     return len;
 }
 static inline size_t bitLenq(const N512 *a)
 {
-    uint32_t *pa, val;
+    uint32_t *pa;
     size_t len;
 
     len = (sizeof(a->val) >> 2) -skiplzq(a, &pa);
-    if (len) {
-        len--;
-        len <<= 5;     
-    } else {
-        return 0;
-    }
-    val = *pa;
-    while(val) {
-        val >>= 1;
-        len++;
-    }
+    len <<= 5;
+    len -= (32 - (dwbLen(*pa)));
 
     return len;
 }
@@ -921,50 +891,50 @@ static inline void sarq(N512 *a, size_t n)
 static inline void wToMask(const N128 *a, N128 *mask)
 {
     uint32_t *pm;
-    size_t len, cnt;
+    size_t blen, wlen, wrem;
 
     copyw(mask, a);
     pm = (uint32_t *)(mask->val);
-    len = bitLenw(mask);
-    for(cnt = 0; cnt < (len >> 5); cnt++) {
+    blen = bitLenw(mask);
+    wlen = (blen + 31) >> 5;    /* quotient round up */
+    wrem = blen & 0x1f;
+
+    for(size_t cnt = 0; cnt < wlen; cnt++) {
         pm[cnt] = 0xffffffff;
     }
-    if(pm[cnt]) {
-        pm[cnt] = 0xffffffff;
-        pm[cnt] >>= (32 - (len & 0x1f));
-    }
+    pm[wlen - 1] >>= (wrem ? (32 - wrem) : 0);
 }
 static inline void dToMask(const N256 *a, N256 *mask)
 {
     uint32_t *pm;
-    size_t len, cnt;
+    size_t blen, wlen, wrem;
 
     copyd(mask, a);
     pm = (uint32_t *)(mask->val);
-    len = bitLend(mask);
-    for(cnt = 0; cnt < (len >> 5); cnt++) {
+    blen = bitLend(mask);
+    wlen = (blen + 31) >> 5;    /* quotient round up */
+    wrem = blen & 0x1f;
+
+    for(size_t cnt = 0; cnt < wlen; cnt++) {
         pm[cnt] = 0xffffffff;
     }
-    if(pm[cnt]) {
-        pm[cnt] = 0xffffffff;
-        pm[cnt] >>= (32 - (len & 0x1f));
-    }
+    pm[wlen - 1] >>= (wrem ? (32 - wrem) : 0);
 }
 static inline void qToMask(const N512 *a, N512 *mask)
 {
     uint32_t *pm;
-    size_t len, cnt;
+    size_t blen, wlen, wrem;
 
     copyq(mask, a);
     pm = (uint32_t *)(mask->val);
-    len = bitLenq(mask);
-    for(cnt = 0; cnt < (len >> 5); cnt++) {
+    blen = bitLenq(mask);
+    wlen = (blen + 31) >> 5;    /* quotient round up */
+    wrem = blen & 0x1f;
+
+    for(size_t cnt = 0; cnt < wlen; cnt++) {
         pm[cnt] = 0xffffffff;
     }
-    if(pm[cnt]) {
-        pm[cnt] = 0xffffffff;
-        pm[cnt] >>= (32 - (len & 0x1f));
-    }
+    pm[wlen - 1] >>= (wrem ? (32 - wrem) : 0);
 }
 
 /**
@@ -1003,6 +973,22 @@ static inline void maskq(N512 *a, N512 *mask)
         pa[i] &= pm[i];
     }
 }
+static inline int cmprange(const void *a, const void *b, size_t wlen)
+{
+    const uint32_t *pa, *pb;
+
+    pa = (uint32_t *)a + wlen - 1;
+    pb = (uint32_t *)b + wlen - 1;
+    while (wlen--) {
+        if (*pa == *pb) {
+            pa--;
+            pb--;
+        }
+        else
+            return *pa > *pb ? 1 : -1;
+    }
+    return 0;
+}
 
 /**
  * Basic mod operation, a mod b
@@ -1012,14 +998,15 @@ static inline void maskq(N512 *a, N512 *mask)
  */
 static inline void modw(N128 *a, const N128 *b, const N128 *bmask)
 {
-    size_t lenOfA, lenOfB, weight, cnt;                 /*bits width, value weight and loop counter*/
-    N128 ha, la, aval, maskb, invb;                     /*middle results*/
+    size_t  lenOfA, lenOfB, weight, cnt;                /*bits width, value weight and loop counter*/
+    N128    aval, mid, maskb, invb;                     /*middle results*/
     
     if (bmask)                                          /*init vars*/
         copyw(&maskb, bmask);
     else
         wToMask(b, &maskb);
     
+    copyw(&aval, a);
     invw(b, &invb);                                     /*-b*/
     lenOfB = bitLenw(b);
     lenOfA = bitLenw(a);
@@ -1029,143 +1016,94 @@ static inline void modw(N128 *a, const N128 *b, const N128 *bmask)
         return;
     }
 
-    wzero(&aval);                                       /*a=0*/
+    wzero(a);
     weight = 0;                                         /*init weight = 0*/
     while (lenOfA) {
-        copyw(&la, a);
-        sarw(&la, weight * lenOfB);
-        maskw(&la, &maskb);
-        copyw(&ha, a);
-        sarw(&ha, (weight + 1) * lenOfB);
-        maskw(&ha, &maskb);
+        copyw(&mid, &aval);
+        maskw(&mid, &maskb);
+        sarw(&aval, lenOfB);
 
-        if (cmpw(&la, b) >= 0) {
-            addw(&la, &invb);
+        if (cmpw(&mid, b) >= 0) {
+            addw(&mid, &invb);
         }
         cnt = (weight * lenOfB);
-        while (cnt) {
-            salw(&la, 1);
-            if (cmpw(&la, b) >= 0) {
-                addw(&la, &invb);
-            }
-            cnt--;
-        }
-        addw(&aval, &la);
-
-        if (cmpw(&aval, b) >= 0) {
-            addw(&aval, &invb);
-        }
-        
-        if (lenOfA > lenOfB) {                          /*if lenOfA > lenOfB, split a*/
-            if (cmpw(&ha, b) >= 0) {
-                addw(&ha, &invb);
-            }
-            cnt = (weight + 1) * lenOfB;
-            while (cnt) {
-                salw(&ha, 1);
-                if (cmpw(&ha, b) >= 0) {
-                    addw(&ha, &invb);
-                }
-                cnt--;
-            }
-            addw(&aval, &ha);
-
-            if (cmpw(&aval, b) >= 0) {
-                addw(&aval, &invb);
+        while (cnt--) {
+            salw(&mid, 1);
+            if (cmpw(&mid, b) >= 0) {
+                addw(&mid, &invb);
             }
         }
 
-        weight += 2;
-        if (lenOfA > (lenOfB << 1))
-            lenOfA -= (lenOfB << 1);
-        else 
-            lenOfA = 0;
+        addw(a, &mid);
+        if (cmpw(a, b) >= 0) {
+            addw(a, &invb);
+        }
+
+        lenOfA -= (lenOfA > lenOfB ? lenOfB : lenOfA);
+        weight++;
     }
-    copyw(a, &aval);
 }
 static inline void modd(N256 *a, const N256 *b, const N256 *bmask)
 {
     size_t lenOfA, lenOfB, weight, cnt;                 /*bits width, value weight and loop counter*/
-    N256 ha, la, aval, maskb, invb;                     /*middle results*/
-    
+    N256   aval, mid, maskb, invb;                     /*middle results*/
+    size_t pos;
+
     if (bmask)                                          /*init vars*/
         copyd(&maskb, bmask);
     else
         dToMask(b, &maskb);
     
+    copyd(&aval, a);
     invd(b, &invb);                                     /*-b*/
     lenOfB = bitLend(b);
     lenOfA = bitLend(a);
+    pos = ((lenOfB + 31) >> 5);
 
     if (lenOfB == 0) {                                  /*arithmetic error*/
         raise(SIGFPE);
         return;
     }
 
-    dzero(&aval);                                       /*a=0*/
+    dzero(a);                                       /*a=0*/
     weight = 0;                                         /*init weight = 0*/
     while (lenOfA) {
-        copyd(&la, a);
-        sard(&la, weight * lenOfB);
-        maskd(&la, &maskb);
-        copyd(&ha, a);
-        sard(&ha, (weight + 1) * lenOfB);
-        maskd(&ha, &maskb);
+        copyd(&mid, &aval);
+        maskd(&mid, &maskb);
+        sard(&aval, lenOfB);
 
-        if (cmpd(&la, b) >= 0) {
-            addd(&la, &invb);
+        if (cmprange(&mid, b, pos) >= 0) {
+            addd(&mid, &invb);
         }
         cnt = (weight * lenOfB);
-        while (cnt) {
-            sald(&la, 1);
-            if (cmpd(&la, b) >= 0) {
-                addd(&la, &invb);
-            }
-            cnt--;
-        }
-        addd(&aval, &la);
-
-        if (cmpd(&aval, b) >= 0) {
-            addd(&aval, &invb);
-        }
-        
-        if (lenOfA > lenOfB) {                          /*if lenOfA > lenOfB, split a*/
-            if (cmpd(&ha, b) >= 0) {
-                addd(&ha, &invb);
-            }
-            cnt = (weight + 1) * lenOfB;
-            while (cnt) {
-                sald(&ha, 1);
-                if (cmpd(&ha, b) >= 0) {
-                    addd(&ha, &invb);
-                }
-                cnt--;
-            }
-            addd(&aval, &ha);
-
-            if (cmpd(&aval, b) >= 0) {
-                addd(&aval, &invb);
+        while (cnt--) {
+            sald(&mid, 1);
+            //if (cmpd(&mid, b) >= 0) {
+            if (cmprange(&mid, b, pos + 1) >= 0) {
+                addd(&mid, &invb);
             }
         }
 
-        weight += 2;
-        if (lenOfA > (lenOfB << 1))
-            lenOfA -= (lenOfB << 1);
-        else 
-            lenOfA = 0;
+        addd(a, &mid);
+        if (cmprange(a, b, pos) >= 0) {
+            addd(a, &invb);
+        }
+
+        lenOfA -= (lenOfA > lenOfB ? lenOfB : lenOfA);
+        weight++;
     }
-    copyd(a, &aval);
 }
 static inline void modq(N512 *a, const N512 *b, const N512 *bmask)
 {
     size_t lenOfA, lenOfB, weight, cnt;                 /*bits width, value weight and loop counter*/
-    N512 ha, la, aval, maskb, invb;                     /*middle results*/
+    N512   aval, mid, maskb, invb;                     /*middle results*/
     
     if (bmask)                                          /*init vars*/
         copyq(&maskb, bmask);
     else
         qToMask(b, &maskb);
     
+    copyq(&aval, a);
     invq(b, &invb);                                     /*-b*/
     lenOfB = bitLenq(b);
     lenOfA = bitLenq(a);
@@ -1175,59 +1113,32 @@ static inline void modq(N512 *a, const N512 *b, const N512 *bmask)
         return;
     }
 
-    qzero(&aval);                                       /*a=0*/
+    qzero(a);                                       /*a=0*/
     weight = 0;                                         /*init weight = 0*/
     while (lenOfA) {
-        copyq(&la, a);
-        sarq(&la, weight * lenOfB);
-        maskq(&la, &maskb);
-        copyq(&ha, a);
-        sarq(&ha, (weight + 1) * lenOfB);
-        maskq(&ha, &maskb);
+        copyq(&mid, &aval);
+        maskq(&mid, &maskb);
+        sarq(&aval, lenOfB);
 
-        if (cmpq(&la, b) >= 0) {
-            addq(&la, &invb);
+        if (cmpq(&mid, b) >= 0) {
+            addq(&mid, &invb);
         }
         cnt = (weight * lenOfB);
-        while (cnt) {
-            salq(&la, 1);
-            if (cmpq(&la, b) >= 0) {
-                addq(&la, &invb);
-            }
-            cnt--;
-        }
-        addq(&aval, &la);
-
-        if (cmpq(&aval, b) >= 0) {
-            addq(&aval, &invb);
-        }
-        
-        if (lenOfA > lenOfB) {                          /*if lenOfA > lenOfB, split a*/
-            if (cmpq(&ha, b) >= 0) {
-                addq(&ha, &invb);
-            }
-            cnt = (weight + 1) * lenOfB;
-            while (cnt) {
-                salq(&ha, 1);
-                if (cmpq(&ha, b) >= 0) {
-                    addq(&ha, &invb);
-                }
-                cnt--;
-            }
-            addq(&aval, &ha);
-
-            if (cmpq(&aval, b) >= 0) {
-                addq(&aval, &invb);
+        while (cnt--) {
+            salq(&mid, 1);
+            if (cmpq(&mid, b) >= 0) {
+                addq(&mid, &invb);
             }
         }
 
-        weight += 2;
-        if (lenOfA > (lenOfB << 1))
-            lenOfA -= (lenOfB << 1);
-        else 
-            lenOfA = 0;
+        addq(a, &mid);
+        if (cmpq(a, b) >= 0) {
+            addq(a, &invb);
+        }
+
+        lenOfA -= (lenOfA > lenOfB ? lenOfB : lenOfA);
+        weight++;
     }
-    copyq(a, &aval);
 }
 
 /**
@@ -1241,8 +1152,8 @@ static inline void vmultw(N128 *a, N128 *b)
 {
     N256 midval;                                                            /*middle and final result*/
     uint32_t *pa, *pb, *pmid;                                               /*travel pointers*/
-    uint64_t sum, ofadd, ofmlt;                                             /*ofadd is addition overflow bits, ofmlt is mult overflow bits*/
-    size_t zcnta, zcntb;                                                    /*leading zero counters*/
+    uint64_t sum, ofmlt;                                                    /*ofadd is addition overflow bits, ofmlt is mult overflow bits*/
+    size_t lenOfA, lenOfB;
     union {
         uint64_t v64;
         struct {
@@ -1251,43 +1162,40 @@ static inline void vmultw(N128 *a, N128 *b)
         } v32;
     } va, vb;                                                               /*union va and vb used to do multipication*/
 
-    pa = (uint32_t *)(a->val);                                              /*init vars*/
-    pb = (uint32_t *)(b->val);
-    pmid = (uint32_t *)(midval.val);
-    zcnta = skiplzw(a, NULL);
-    zcntb = skiplzw(b, NULL);
+    pb = (uint32_t *)(b->val);                                              /*init vars*/
+    lenOfA = (sizeof(a->val) >> 2) - skiplzw(a, NULL);
+    lenOfB = (sizeof(b->val) >> 2) - skiplzw(b, NULL);
     dzero(&midval);
 
-    for(size_t cnt1 = 0; cnt1 < (sizeof(b->val) >> 2) - zcntb; cnt1++) {    /*outter loop depends on len of b*/
+    for(size_t cnt1 = 0; cnt1 < lenOfB; cnt1++) {                           /*outter loop depends on len of b*/
         vb.v64 = *pb++;                                                     /*set vb*/
-        pa = (uint32_t *)(a->val);                                          /*set pa*/
-        pmid = (uint32_t *)(midval.val) + cnt1;                             /*set pmid, pmid moving with outter loop*/
+        pa = (uint32_t *)a->val;                                            /*set pa*/
+        pmid = (uint32_t *)midval.val + cnt1;                               /*set pmid, pmid moving with outter loop*/
 
-        ofadd = 0;                                                          /*init ofadd and ofmlt*/
         ofmlt = 0;
-        for(size_t cnt2 = 0; cnt2 < (sizeof(a->val) >> 2) -zcnta; cnt2++) { /*inner loop depends on len of a*/
+        sum = 0;
+        for(size_t cnt2 = 0; cnt2 < lenOfA; cnt2++) {                       /*inner loop depends on len of a*/
             va.v64 = *pa++;                                                 /*set va*/
-            va.v64 *= vb.v64;
-            va.v64 += ofmlt;
-            ofmlt = va.v32.r;                                               /*reset ofmlt*/
+            va.v64 *= vb.v64;                                               /* a*b */
 
-            sum = *pmid;                                                    /*read pmid value*/
+            sum += *pmid;                                                   /*read pmid value*/
             sum += va.v32.l;
-            sum += ofadd;
-            ofadd = (sum >> 32);                                            /*reset ofadd*/
+            sum += ofmlt;
             *pmid++ = sum;                                                  /*write back pmid value*/
-        }
-        *pmid = ofmlt + ofadd;                                              /*write back last pmid*/
-    }
 
+            ofmlt = va.v32.r;                                               /* update multiplication carrier */
+            sum >>= 32;                                                     /* update addition carrier */
+        }
+        *pmid = ofmlt + sum;                                                /*write back last pmid*/
+    }
     *a = castdtw(&midval);                                                  /*write final result to a, cast from N256 to N128*/
 }
 static inline void vmultd(N256 *a, N256 *b)
 {
     N512 midval;
     uint32_t *pa, *pb, *pmid;
-    uint64_t sum, ofadd, ofmlt;
-    size_t zcnta, zcntb;
+    uint64_t sum, ofmlt;
+    size_t lenOfA, lenOfB;
     union {
         uint64_t v64;
         struct {
@@ -1296,33 +1204,31 @@ static inline void vmultd(N256 *a, N256 *b)
         } v32;
     } va, vb;
 
-    pa = (uint32_t *)(a->val);
     pb = (uint32_t *)(b->val);
-    pmid = (uint32_t *)(midval.val);
-    zcnta = skiplzd(a, NULL);
-    zcntb = skiplzd(b, NULL);
+    lenOfA = (sizeof(a->val) >> 2) - skiplzd(a, NULL);
+    lenOfB = (sizeof(b->val) >> 2) - skiplzd(b, NULL);
     qzero(&midval);
 
-    for(size_t cnt1 = 0; cnt1 < (sizeof(b->val) >> 2) - zcntb; cnt1++) {
+    for(size_t cnt1 = 0; cnt1 < lenOfB; cnt1++) {
         vb.v64 = *pb++;
-        pa = (uint32_t *)(a->val);
-        pmid = (uint32_t *)(midval.val) + cnt1;
+        pa = (uint32_t *)a->val;
+        pmid = (uint32_t *)midval.val + cnt1;
 
-        ofadd = 0;
         ofmlt = 0;
-        for(size_t cnt2 = 0; cnt2 < (sizeof(a->val) >> 2) - zcnta; cnt2++) {
-            va.v64 = *pa++;
-            va.v64 *= vb.v64;
-            va.v64 += ofmlt;
-            ofmlt = va.v32.r;
+        sum = 0;
+        for(size_t cnt2 = 0; cnt2 < lenOfA; cnt2++) {
+            va.v64 = *pa++;                                                 /*set va*/
+            va.v64 *= vb.v64;                                               /* a*b */
 
-            sum = *pmid;
+            sum += *pmid;                                                   /*read pmid value*/
             sum += va.v32.l;
-            sum += ofadd;
-            ofadd = (sum >> 32);
-            *pmid++ = sum;
+            sum += ofmlt;
+            *pmid++ = sum;                                                  /*write back pmid value*/
+
+            ofmlt = va.v32.r;                                               /* update multiplication carrier */
+            sum >>= 32;                                                     /* update addition carrier */
         }
-        *pmid = ofmlt + ofadd;
+        *pmid = ofmlt + sum;
     }
 
     *a = castqtd(&midval);
@@ -1331,8 +1237,8 @@ static inline void vmultq(N512 *a, N512 *b)
 {
     N1024 midval;
     uint32_t *pa, *pb, *pmid;
-    uint64_t sum, ofadd, ofmlt;
-    size_t zcnta, zcntb;
+    uint64_t sum, ofmlt;
+    size_t lenOfA, lenOfB;
     union {
         uint64_t v64;
         struct {
@@ -1341,33 +1247,31 @@ static inline void vmultq(N512 *a, N512 *b)
         } v32;
     } va, vb;
 
-    pa = (uint32_t *)(a->val);
     pb = (uint32_t *)(b->val);
-    pmid = (uint32_t *)(midval.val);
-    zcnta = skiplzq(a, NULL);
-    zcntb = skiplzq(b, NULL);
+    lenOfA = (sizeof(a->val) >> 2) - skiplzq(a, NULL);
+    lenOfB = (sizeof(b->val) >> 2) - skiplzq(b, NULL);
     zero1024(&midval);
 
-    for(size_t cnt1 = 0; cnt1 < (sizeof(b->val) >> 2) - zcntb; cnt1++) {
+    for(size_t cnt1 = 0; cnt1 < lenOfB; cnt1++) {
         vb.v64 = *pb++;
         pa = (uint32_t *)(a->val);
         pmid = (uint32_t *)(midval.val) + cnt1;
 
-        ofadd = 0;
         ofmlt = 0;
-        for(size_t cnt2 = 0; cnt2 < (sizeof(a->val) >> 2) -zcnta; cnt2++) {
-            va.v64 = *pa++;
-            va.v64 *= vb.v64;
-            va.v64 += ofmlt;
-            ofmlt = va.v32.r;
+        sum = 0;
+        for(size_t cnt2 = 0; cnt2 < lenOfA; cnt2++) {
+            va.v64 = *pa++;                                                 /*set va*/
+            va.v64 *= vb.v64;                                               /* a*b */
 
-            sum = *pmid;
+            sum += *pmid;                                                   /*read pmid value*/
             sum += va.v32.l;
-            sum += ofadd;
-            ofadd = (sum >> 32);
-            *pmid++ = sum;
+            sum += ofmlt;
+            *pmid++ = sum;                                                  /*write back pmid value*/
+
+            ofmlt = va.v32.r;                                               /* update multiplication carrier */
+            sum >>= 32;                                                     /* update addition carrier */
         }
-        *pmid = ofmlt + ofadd;
+        *pmid = ofmlt + sum;
     }
 
     *a = cast1024tq(&midval);

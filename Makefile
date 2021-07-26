@@ -13,9 +13,9 @@ lib_dir = $(shell pwd)/libs
 
 OBJ_LPUTL := $(source)/posix/wrappers.o $(source)/posix/errHandler.o $(source)/posix/sigHandlerUtl.o $(source)/posix/sioUtl.o
 OBJ_TEST := $(source)/calTest.c $(source)/jsmn.c $(source)/logger.c $(source)/mode.c $(source)/primeNTest.c $(source)/utl1.c src/utl2.c $(source)/utl3.c
-OBJ_PGEN := $(source)/pGenerator.c $(source)/primeNTest.c $(source)/utl1.c src/utl3.c $(source)/mode.c
+OBJ_PGEN := $(source)/pGenerator.c $(source)/primeNTest.c $(source)/utl1.c src/utl3.c $(source)/mode.c $(source)/sha/bitArray.c
 OBJ_CTEST := $(source)/ctest.c $(source)/primeTable.c $(source)/Euler.c $(source)/Euclid.c $(source)/powerMod.c
-OBJ_SHADEMO := $(source)/sha/sha1.c $(source)/sha/sha224-256.c $(source)/jsmn.c  $(source)/sha/utls.c $(source)/sha/sha384-512.c $(source)/sha/base64.c $(source)/sha/demo.c 
+OBJ_DEMO := $(source)/sha/sha1.c $(source)/sha/sha224-256.c $(source)/jsmn.c  $(source)/sha/utls.c $(source)/sha/sha384-512.c $(source)/sha/base64.c $(source)/aes/aes.c $(source)/sha/bitArray.c $(source)/aes/aesModes.c $(source)/sha/demo.c 
 OBJ_SHAFUTL := $(source)/sha/sha1.c $(source)/sha/sha224-256.c  $(source)/sha/utls.c $(source)/sha/sha384-512.c $(source)/sha/filesha.c
 OBJ_B64FUTL := $(source)/sha/base64.c $(source)/sha/fileb64.c 
 
@@ -33,8 +33,8 @@ caltest: $(OBJ_TEST) $(include_dir)/*.h
 ctest: $(OBJ_CTEST) $(include_dir)/littlePrime.h
 	$(CC) $(OPTMZ3) $(CFLAGS) -o ctest $(OBJ_CTEST)
 
-shademo : $(OBJ_SHADEMO)
-	$(CC) $(OPTMZ0) $(CFLAGS) -o shademo $(OBJ_SHADEMO)
+demo : $(OBJ_DEMO)
+	$(CC) $(OPTMZ0) $(CFLAGS) -o demo $(OBJ_DEMO)
 
 shafutl : $(OBJ_SHAFUTL)
 	$(CC) $(OPTMZ0) $(CFLAGS) -o shafutl $(OBJ_SHAFUTL)
@@ -46,6 +46,6 @@ clean:
 	rm -f *.O
 	rm -f *.s
 	rm -f *.out
-	rm pgen caltest ctest shademo shafutl
+	rm pgen caltest ctest demo shafutl
 
 .PHONY: clean

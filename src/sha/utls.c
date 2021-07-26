@@ -33,12 +33,13 @@ int SHA1FHash(const char *filename, uint8_t *sha1dgest)
 		close(fd);
 		return shaBadParam;
 	}
-	if (!S_ISREG(sta.st_mode)) {					/* work on regular file only */
+	/*
+	if (!S_ISREG(sta.st_mode)) {					
 		fprintf(stderr, "%s is not regular file\n", filename);
 		close(fd);
 		return shaBadParam;
 	}
-
+	*/
 	SHA1Reset(&ctx);											/* init context */
 	while (1) {
 		r = read(fd, fbuffer, FBUFFERSIZE);
