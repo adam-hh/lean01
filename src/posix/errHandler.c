@@ -126,7 +126,6 @@ static void err_doit(int errnoflag, int error, const char *fmt, va_list ap)
     strcat(buf, "\n");
     fflush(stdout);
     fputs(buf, stderr);
-    fflush(NULL);
 }
 
 /**
@@ -275,4 +274,32 @@ static void log_doit(int errorflag, int error, int priority, const char *fmt, va
     } else {
         syslog(priority, "%s", buf);
     }
+}
+
+/* Wrapper of malloc with err exit */
+void *Malloc(size_t sz)
+{
+    void *ptr;
+
+    if ((ptr = malloc(sz)) == NULL)
+        err_sys("fatal error: malloc error");
+    return ptr;
+}
+/* Wrapper of calloc with err exit */
+void *Calloc(size_t cnt, size_t sz)
+{
+    void *ptr;
+
+    if ((ptr = calloc(cnt, sz)) == NULL)
+        err_sys("fatal error: calloc error");
+    return ptr;
+}
+/* Wrapper of realloc with err exit */
+void *Realloc(void *ptr, size_t sz)
+{
+    void *p;
+
+    if ((p = realloc(ptr, sz)) == NULL)
+        err_sys("fatal error: realloc error");
+    return p;
 }
