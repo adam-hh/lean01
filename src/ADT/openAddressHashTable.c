@@ -60,7 +60,7 @@ Index oahtFind_p(char *key, HashTable H)
 
   collisionNum = 0;
   cur = Hash(key, H->tableSize);
-  while (H->cells[cur].info != EMPTY && !strCmp(key, H->cells[cur].key)) {
+  while (H->cells[cur].info != EMPTY && strcmp(key, H->cells[cur].key) != 0) {
     cur += ((++collisionNum) << 1) - 1;   /* may overflow */
     if (cur >= H->tableSize)
       cur -= H->tableSize;

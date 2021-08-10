@@ -64,7 +64,7 @@ CListPosition htFind_p(char *key, HashTable H)
   CListPosition p;
 
   p = H->lists[Hash(key, H->tableSize)];
-  while (p && !strCmp(p->key, key))
+  while (p && strcmp(p->key, key) != 0)
     p = p->next;
   return p;
 }
@@ -138,7 +138,7 @@ void htDeleteNode_p(char *Key, HashTable H)
   idx = Hash(Key, H->tableSize);
   lcur = lpre = H->lists[idx];
   if (lcur) {
-    while (lcur && !strCmp(Key, lcur->key)) {
+    while (lcur && strcmp(Key, lcur->key) != 0) {
       lpre = lcur;
       lcur = lcur->next;
     }

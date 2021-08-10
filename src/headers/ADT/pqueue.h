@@ -23,8 +23,8 @@ PrimitiveType bhFindMin(binHeapPQueue H);
 int bhIsEmpty(binHeapPQueue H);
 int bhIsFull(binHeapPQueue H);
 
-void heapSort(PrimitiveType *A, int lenOfA);
-
+void heapSort(PrimitiveType *A, size_t lenOfA);
+PrimitiveType heapSelect(PrimitiveType *A, size_t lenOfA, size_t k);
 
 #ifdef __cpluscplus
 }

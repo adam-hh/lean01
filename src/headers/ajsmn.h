@@ -25,6 +25,7 @@
 #define AJSMN_H
 
 #include <stddef.h>
+#include "errhandler.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,6 +35,14 @@ extern "C" {
 #define JSMN_API static
 #else
 #define JSMN_API extern
+#endif
+
+#ifndef JSMN_PARENT_LINKS
+#define JSMN_PARENT_LINKS
+#endif
+
+#ifdef JSMN_STRICT
+#undef JSMN_STRICT
 #endif
 
 /**
@@ -48,7 +57,8 @@ typedef enum {
   JSMN_OBJECT = 1,
   JSMN_ARRAY = 2,
   JSMN_STRING = 3,
-  JSMN_PRIMITIVE = 4
+  JSMN_PRIMITIVE = 4,
+  JSMN_KEY = 5    /* JSMN_KEY is a alias of JSMN_STRING */
 } jsmntype_t;
 
 enum jsmnerr {
@@ -87,30 +97,25 @@ typedef struct jsmn_parser {
 } jsmn_parser;
 
 /**
- * Create JSON parser over an array of tokens
+ * Creates a new parser based over a given buffer with an array of tokens
+ * available.
  */
-JSMN_API void jsmn_init(jsmn_parser *parser);
+#define jsmn_init(parser) \
+  (parser)->pos = 0;  \
+  (parser)->toknext = 0;  \
+  (parser)->toksuper = -1
 
 /**
  * Run JSON parser. It parses a JSON data string into and array of tokens, each
  * describing
  * a single JSON object.
  */
-JSMN_API int jsmn_parse(jsmn_parser *parser, const char *js, const size_t len,
+JSMN_API int jsmn_parse(const char *js, const size_t len,
                         jsmntok_t *tokens, const unsigned int num_tokens);
 
-/**
- * Query s from json
- */
-JSMN_API int jsoneq(const char *json, jsmntok_t *tok, const char *s);
+JSMN_API int jsmn_Parse(const char *js, size_t jsLen, jsmntok_t **tokens);
 
-/**
- * Fetch a token
- * input:   json, tok, toksize, s
- * output:  none
- * return:  token address(associate with s)
- */
-JSMN_API jsmntok_t *jsonfetch(const char *json, jsmntok_t *toklist, size_t toksize, const char *s);
+JSMN_API jsmntok_t *jsmn_NextTok(const char *js, const char *key, jsmntok_t *tokens,size_t numTokens);
 
 #ifdef __cplusplus
 }

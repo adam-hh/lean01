@@ -6,6 +6,7 @@
 #include "binTree.h"
 #include "hashTable.h"
 #include "pqueue.h"
+#include "sorting.h"
 
 SearchTree treeDeleteNode_p2(PrimitiveType X, SearchTree T);
 SearchTree treeDeleteNode_p3(PrimitiveType X, SearchTree T);
@@ -95,19 +96,26 @@ int binTreeDemo(int argc, char *argv[])
 
 int main(int argc, char *argv[])
 {
-  int fdrandom;
-  char usr[200];
+  int i, fdrandom;
+  char usr[203], tmp;
 
   if ((fdrandom = open("/dev/urandom", O_RDONLY)) == -1)
     err_sys("fatal error: open /dev/urandom fail");
   read(fdrandom, usr, sizeof(usr));
   printf("origin list:\n");
-  for (int i = 0; i < sizeof(usr); i++)
-    printf("%4d%c", usr[i], (i + 1) % 20 ? ',' : '\n');
-  heapSort(usr, sizeof(usr));
-  printf("sorted list:\n");
-  for (int i = 0; i < sizeof(usr); i++)
-    printf("%4d%c", usr[i], (i + 1) % 20 ? ',' : '\n');
+  for (i = 0; i < sizeof(usr); i++)
+    printf("%4d%c", usr[i], (i + 1) % 20 ? ' ' : '\n');
+  //heapSort(usr, sizeof(usr));
+  //shellSort(usr, sizeof(usr));
+  qSort_p(usr, 0, sizeof(usr) - 1);
+  printf("\nsorted list:\n");
+  for (i = 0; i < sizeof(usr); i++)
+    printf("%4d%c", usr[i], (i + 1) % 20 ? ' ' : '\n');
+  if ((i + 1) % 20)
+    putchar('\n');
 
+  tmp = heapSelect(usr, sizeof(usr), 10);
+  printf("the 10th greatest element is %d\n", tmp);
+  close(fdrandom);
   exit(0);
 }

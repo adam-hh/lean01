@@ -5,49 +5,35 @@
 #include <string.h>
 #include <poll.h>
 #include "primitiveStack.h"
-#include "primitiveSorting.h"
 #include "singleList.h"
+#include "ajsmn.h"
 
-DEFINE_PRIMSORTING_OF(char)
-DEFINE_PRIMLIST_OF(char)
+static char *types[] = {
+  "JSMN_UNDEFINED",
+  "JSMN_OBJECT",
+  "JSMN_ARRAY",
+  "JSMN_STRING",
+  "JSMN_PRIMITIVE",
+  "JSMN_KEY"
+};
+
 int main(int argc, char *argv[])
 {
-  /*
-  int fd[2];
-  FILE *fp0, *fp1;
-  pid_t pid;
-  struct pollfd pl[2];
+  char rbuf[10240];
+  FILE *fp;
+  int n;
+  jsmntok_t *tokens, *tok;
 
-  if (pipe(fd) < 0)
-    err_sys("error: pipe error");
-  fp0 = fdopen(fd[0], "r");
-  fp1 = fdopen(fd[1], "w");
-
-  if ((pid = fork()) < 0)
-    err_sys("error: fork error");
-  if (pid == 0) {
-    fclose(fp1);
-    reverPoland(fp0, stdout);
-    exit(0);
-  } else {
-    fclose(fp0);
-    postToinfix(stdin, fp1);
-    exit(0);
-  }
-  */
-  int fdrandom;
-  char data[1024];
-  if ((fdrandom = open("/dev/urandom", O_RDONLY)) == -1)
-    err_sys("open /dev/urandom error");
-  if (read(fdrandom, data, sizeof(data)) != sizeof(data))
-    err_quit("read random error");
-  //shellSort_char(data, sizeof(data));
-  qsort_char(data, 0, 1023);
-
-  for (int i = 0; i < sizeof(data); i++) {
-    printf("%4d%c", data[i], (i + 1) % 20 == 0 ? '\n' : ',');
-  }
-  putchar('\n');
-  LIST_OF(char) *cl;
-  cl = listCreateList_char();
+  tokens = NULL;
+  if ((fp = fopen(argv[1], "r")) == NULL)
+    err_sys("error: fopen %s fail", argv[1]);
+  n = fread(rbuf, sizeof(char), sizeof(rbuf) - 1, fp);
+  rbuf[n] = '\0';
+  n = jsmn_Parse(rbuf, sizeof(rbuf), &tokens);
+  if ((tok = jsmn_NextTok(rbuf, argv[2], tokens, n)))
+    printf("%.*s\n", tok->end - tok->start, &rbuf[tok->start]);
+  else
+    printf("%s not found\n", argv[2]);
+  if (n > 0)
+    free(tokens);
 }
